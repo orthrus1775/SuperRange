@@ -37,14 +37,10 @@ attackbox_additional_tools = [
   "john",
   "hydra",
   "metasploit-framework",
-  "sqlmap",
-  "gobuster",
-  "dirb",
   "responder",
   "smbclient",
   "enum4linux",
   "nbtscan",
-  "nikto"
 ]
 
 attackbox_additional_python_tools = [

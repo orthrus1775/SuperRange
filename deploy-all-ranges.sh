@@ -102,9 +102,7 @@ deploy_range() {
         (cd "$range_dir/goad" && git pull)
     fi
 
-    # Create extensions directory if it doesn't exist
-    mkdir -p "$range_dir/goad/extensions"
-    
+   
     # Copy attackboxes extension to the range's GOAD extensions folder
     echo -e "${YELLOW}Copying attackboxes extension to Range ${range_id}...${NC}"
     cp -r "$ATTACKBOXES_DIR" "$range_dir/goad/extensions/"
