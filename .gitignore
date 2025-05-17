@@ -1,0 +1,44 @@
+# Deployment directories and files
+ranges/*/
+dashboard/
+deployment-status.json
+destruction-status.json
+**/docs/
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+**/.terraform.tfstate.lock.info
+**/terraform.tfstate*
+**/*.tfplan
+
+# Logs and temporary files
+**/*.log
+temp.json
+*.tmp
+*~
+**/*.bak
+
+# AWS credentials
+.aws/
+
+# GOAD repository
+**/goad/.git/
+
+# Allow README but ignore other files in ranges
+ranges/*
+!ranges/README.md
+
+# System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.directory
+.Trash-*
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
