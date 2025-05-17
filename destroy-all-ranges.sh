@@ -49,6 +49,7 @@ destroy_range() {
     fi
     
     # Update status
+    
     update_status "$range_id" "destroyed" "Destruction completed successfully"
     echo -e "${GREEN}Range ${range_id} destroyed successfully.${NC}"
 }

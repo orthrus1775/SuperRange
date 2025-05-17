@@ -76,4 +76,5 @@ if [ $? -eq 0 ]; then
 else
     echo -e "${RED}Error: GOAD destruction failed for Range ${RANGE_ID}.${NC}"
     exit 1
+    
 fi

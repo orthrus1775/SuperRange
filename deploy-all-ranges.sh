@@ -21,6 +21,7 @@ ATTACKBOXES_DIR="./attackboxes"
 mkdir -p ranges
 mkdir -p dashboard
 
+
 # Initialize deployment status file if it doesn't exist
 if [ ! -f "$DEPLOYMENT_STATUS_FILE" ]; then
     echo '{"ranges": {}}' > "$DEPLOYMENT_STATUS_FILE"

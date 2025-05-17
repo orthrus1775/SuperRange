@@ -17,6 +17,7 @@ if [ $# -lt 1 ]; then
     exit 1
 fi
 
+
 RANGE_ID="$1"
 RANGE_DIR="ranges/range${RANGE_ID}"
 GOAD_DIR="${RANGE_DIR}/goad"

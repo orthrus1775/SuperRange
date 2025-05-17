@@ -1,6 +1,8 @@
 #!/bin/bash
 # generate-docs.sh - Generate documentation for a specific range
 
+# NEEDS REVIEW
+
 set -e # Exit on any error
 
 # Check arguments
