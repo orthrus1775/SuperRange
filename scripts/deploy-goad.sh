@@ -67,38 +67,38 @@ find . -name "windows.tf" -exec grep -l "ami-" {} \; | while read -r file; do
 done
 
 # Update GOAD-Light inventory to disable updates and Windows Defender
-INVENTORY_FILE="ad/GOAD-Light/data/inventory"
+INVENTORY_FILE="$GOAD_DIR/ad/GOAD-Light/data/inventory"
 if [ -f "$INVENTORY_FILE" ]; then
     echo "Updating GOAD inventory to speed up deployment..."
     # Create backup of the original inventory
     cp "$INVENTORY_FILE" "${INVENTORY_FILE}.bak"
     
-    # Update inventory file to disable updates and Windows Defender for all servers
-    cat > "$INVENTORY_FILE" << EOF
-; allow computer update
-; usage : update.yml
-[update]
-
-; disable update
-; usage : update.yml
-[no_update]
-dc01
-dc02
-srv02
-ws01
-
-; allow defender
-; usage : security.yml
-[defender_on]
-
-; disable defender
-; usage : security.yml
-[defender_off]
-dc01
-dc02
-srv02
-ws01
-EOF
+    # Clear hosts from [update] section and add them to [no_update]
+    sed -i '/\[update\]/,/\[no_update\]/ {
+        # Delete non-comment lines between sections
+        /^\[update\]/b
+        /^\[no_update\]/b
+        /^;/b
+        /^$/b
+        d
+    }' "$INVENTORY_FILE"
+    
+    # Add all hosts to [no_update] section
+    sed -i '/\[no_update\]/a dc01\ndc02\nsrv02\nws01' "$INVENTORY_FILE"
+    
+    # Clear hosts from [defender_on] section
+    sed -i '/\[defender_on\]/,/\[defender_off\]/ {
+        # Delete non-comment lines between sections
+        /^\[defender_on\]/b
+        /^\[defender_off\]/b
+        /^;/b
+        /^$/b
+        d
+    }' "$INVENTORY_FILE"
+    
+    # Add all hosts to [defender_off] section
+    sed -i '/\[defender_off\]/a dc01\ndc02\nsrv02\nws01' "$INVENTORY_FILE"
+    
     echo "Inventory updated to disable all updates and Windows Defender."
 else
     echo "Warning: GOAD inventory file not found at $INVENTORY_FILE"
