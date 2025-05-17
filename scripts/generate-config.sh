@@ -44,8 +44,6 @@ cat > "$CONFIG_FILE" <<EOF
   "range_number": ${RANGE_ID},
   "aws_region": "${AWS_REGION}",
   "aws_key_pair": "${AWS_KEY_PAIR}",
-  "vpc_cidr": "${VPC_CIDR}",
-  "subnet_cidr": "${SUBNET_CIDR}",
   "goad_network": "${GOAD_NETWORK}",
   "desktop_environment": {
     "enabled": true,

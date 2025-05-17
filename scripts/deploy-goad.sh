@@ -95,6 +95,35 @@ sed -i "s|ami-[a-z0-9]*|${WIN_AMI}|g"  $WINDOWS_TF_PATH
 
 echo -e "${GREEN}Updated AMI IDs in windows.tf${NC}"
 
+echo -e "${YELLOW}Getting latest Ubuntu 24.04 LTS AMI for region ${AWS_REGION}...${NC}"
+UBUNTU_AMI=$(aws ec2 describe-images \
+    --region "$AWS_REGION" \
+    --owners 099720109477 \
+    --filters "Name=name,Values=*ubuntu*24.04*server*" \
+             "Name=architecture,Values=x86_64" \
+             "Name=root-device-type,Values=ebs" \
+    --query "sort_by(Images, &CreationDate)[-1].ImageId" \
+    --output text)
+
+if [ -z "$UBUNTU_AMI" ]; then
+    echo -e "${RED}Error: Could not find Ubuntu 24.04 LTS AMI for region ${AWS_REGION}.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}Found Ubuntu 24.04 LTS AMI: ${UBUNTU_AMI}${NC}"
+
+LINUX_TF_PATH=$(pwd)/extensions/attackboxes/providers/aws/linux.tf
+
+if [ ! -f "$LINUX_TF_PATH" ]; then
+    echo -e "${RED}Error: Windows terraform file not found at: $WINDOWS_TF_PATH${NC}"
+    exit 1
+fi
+
+echo -e "${YELLOW}Updating Windows AMI IDs in windows.tf...${NC}"
+sed -i "s|ami-[a-z0-9]*|${UBUNTU_AMI}|g"  $LINUX_TF_PATH
+
+echo -e "${GREEN}Updated AMI IDs in linux.tf${NC}"
+read -p "Press Enter to continue..."
+
 
 # Deploy GOAD Light with a Windows 10 workstation and attackboxes extension
 echo -e "${YELLOW}Deploying GOAD Light with Windows 10 workstation and attackboxes...${NC}"
