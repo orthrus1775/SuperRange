@@ -1,0 +1,8 @@
+network:
+  version: 2
+  ethernets:
+    ens5:
+      dhcp4: true
+      routes:
+        - to: 192.168.{{ range_number }}.0/24
+          via: {{ ansible_default_ipv4.gateway }}

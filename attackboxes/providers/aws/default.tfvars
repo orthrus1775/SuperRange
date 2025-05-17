@@ -6,7 +6,7 @@ attackbox_count      = 3
 attackbox_base_name  = "attackbox"
 attackbox_username   = "ubuntu"
 attackbox_password   = "AttackBox2024!"
-attackbox_ip_start   = 51
+attackbox_ip_start   = 81
 attackbox_ssh_port_start = 2251
 
 # AWS specific configuration
@@ -49,10 +49,7 @@ attackbox_additional_tools = [
 
 attackbox_additional_python_tools = [
   "impacket",
-  "bloodhound",
   "crackmapexec",
-  "pwntools",
-  "scapy"
 ]
 
 attackbox_git_repos = [
@@ -63,10 +60,6 @@ attackbox_git_repos = [
   {
     name = "mimikatz"
     url  = "https://github.com/gentilkiwi/mimikatz.git"
-  },
-  {
-    name = "BloodHound"
-    url  = "https://github.com/BloodHoundAD/BloodHound.git"
   },
   {
     name = "PEASS-ng"

@@ -17,7 +17,6 @@
       # Useful utilities
       - git
       - vim
-      - htop
       - unzip
       - python3
       - python3-pip
@@ -25,7 +24,10 @@
       - dnsutils
       - iputils-ping
       - traceroute
+      - tmux
+      - screen
       - ubuntu-desktop
+      - xrdp
     state: present
 
 - name: Install additional security tools
@@ -40,19 +42,70 @@
     state: present
   failed_when: false
 
-- name: Configure hosts file
-  template:
-    src: hosts.j2
-    dest: /etc/hosts
-    owner: root
-    group: root
-    mode: '0644'
+# - name: Configure hosts file
+#   template:
+#     src: hosts.j2
+#     dest: /etc/hosts
+#     owner: root
+#     group: root
+#     mode: '0644'
+
+# - name: Configure krb5.conf
+#   template:
+#     src: krb5.conf.j2
+#     dest: /etc/krb5.conf
+#     owner: root
+#     group: root
+#     mode: '0644'
+#   when: setup_kerberos | default(true)
+
+# - name: Configure network for GOAD connection
+#   template:
+#     src: 99-goad-connection.yaml.j2
+#     dest: /etc/netplan/99-goad-connection.yaml
+#     owner: root
+#     group: root
+#     mode: '0644'
+#   when: setup_goad_network | default(true)    
+
+# - name: Apply netplan configuration
+#   command: netplan apply
+#   when: setup_goad_network | default(true)  
 
 - name: Enable and start SSH
   service:
     name: ssh
     state: started
     enabled: yes
+
+- name: Enable and start XRDP service
+  systemd:
+    name: xrdp
+    enabled: yes
+    state: started
+
+- name: Create PolicyKit file for XRDP
+  copy:
+    dest: /etc/polkit-1/localauthority/50-local.d/45-allow-colord.pkla
+    content: |
+      [Allow Colord all Users]
+      Identity=unix-user:*
+      Action=org.freedesktop.color-manager.create-device;org.freedesktop.color-manager.create-profile;org.freedesktop.color-manager.delete-device;org.freedesktop.color-manager.delete-profile;org.freedesktop.color-manager.modify-device;org.freedesktop.color-manager.modify-profile
+      ResultAny=no
+      ResultInactive=no
+      ResultActive=yes
+    mode: '0644'
+
+- name: Fix XRDP black screen after login
+  copy:
+    dest: /etc/xrdp/startwm.sh
+    content: |
+      #!/bin/sh
+      # xrdp X session starter script
+      unset DBUS_SESSION_BUS_ADDRESS
+      unset XDG_RUNTIME_DIR
+      . /etc/X11/Xsession
+    mode: '0755'
 
 - name: Configure firewall (UFW)
   ufw:
@@ -63,9 +116,14 @@
     - 22
     - 80
     - 443
+    - 3389 # RDP port
     - 4444
     - 8080
-  failed_when: false
+    - 9001
+    - 9002
+    - 9003
+    - 9004
+  failed_when: fals
 
 - name: Enable UFW
   ufw:
@@ -94,33 +152,40 @@
   loop: "{{ attackbox_git_repos }}"
   failed_when: false
 
-- name: Set shell prompt and aliases
-  blockinfile:
-    path: /etc/profile.d/goad.sh
-    create: yes
-    block: |
-      # GOAD environment settings
-      export PS1="\[\033[1;31m\]\u@\h\[\033[1;34m\] \w\[\033[0m\]\$ "
-      alias ll='ls -la'
-      alias update='apt update && apt upgrade -y'
-      alias nmap-quick='nmap -sV -sC -T4'
-      alias nmap-full='nmap -sV -sC -p- -T4'
-    mode: '0644'
+- name: Create Desktop directory for ubuntu user
+  file:
+    path: /home/ubuntu/Desktop
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+  when: setup_desktop_shortcuts | default(true)
 
-- name: Create README file
-  copy:
-    dest: /opt/attack-tools/README.txt
-    content: |
-      This attack box is part of the GOAD (Game of Active Directory) environment.
-      It is running Ubuntu 24.04 and is configured for offensive security testing.
-      
-      Useful commands:
-      - nmap-quick [target IP] - Quick scan with service detection
-      - nmap-full [target IP] - Full port scan with service detection
-      - sudo responder -I eth0 -wrf - Start Responder
-      - crackmapexec smb [IP/range] - Scan SMB services
-      
-      For more information about GOAD, visit: https://github.com/Orange-Cyberdefense/GOAD
-    owner: root
-    group: root
-    mode: '0644'
+- name: Create desktop shortcuts
+  template:
+    src: "{{ item }}.desktop.j2"
+    dest: "/home/ubuntu/Desktop/{{ item }}.desktop"
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+  with_items:
+    - terminal
+    - firefox
+  when: setup_desktop_shortcuts | default(true)
+  failed_when: false  
+
+- name: Create Documents directory for ubuntu user
+  file:
+    path: /home/ubuntu/Documents
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+  when: setup_desktop_shortcuts | default(true)
+
+- name: Enable IP forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: yes
