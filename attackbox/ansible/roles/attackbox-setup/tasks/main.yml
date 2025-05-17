@@ -1,0 +1,95 @@
+---
+# Main tasks for setting up Ubuntu servers
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install required packages
+  apt:
+    name:
+      - net-tools
+      - tcpdump
+      - wireshark
+      - nmap
+      - curl
+      - wget
+      - unzip
+      - git
+      - vim
+      - htop
+      - python3
+      - python3-pip
+      - ansible
+      - openssh-server
+      - dnsutils
+      - iputils-ping
+      - traceroute
+    state: present
+
+- name: Configure hosts file
+  template:
+    src: hosts.j2
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable and start SSH
+  service:
+    name: ssh
+    state: started
+    enabled: yes
+
+- name: Configure firewall (UFW)
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 22
+    - 80
+    - 443
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: allow
+  failed_when: false
+
+- name: Create a test file to verify deployment
+  file:
+    path: /root/ubuntu_server_deployed.txt
+    state: touch
+    mode: '0644'
+    owner: root
+    group: root
+  
+- name: Create GOAD tools directory
+  file:
+    path: /opt/goad-tools
+    state: directory
+    mode: '0755'
+
+- name: Create README file
+  copy:
+    dest: /opt/goad-tools/README.txt
+    content: |
+      This server is part of the GOAD (Game of Active Directory) environment.
+      It is running Ubuntu 24.04 and is configured for testing and practice.
+      
+      For more information about GOAD, visit: https://github.com/Orange-Cyberdefense/GOAD
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Set shell prompt and aliases
+  blockinfile:
+    path: /etc/profile.d/goad.sh
+    create: yes
+    block: |
+      # GOAD environment settings
+      export PS1="\[\033[1;32m\]\u@\h\[\033[1;34m\] \w\[\033[0m\]\$ "
+      alias ll='ls -la'
+      alias update='apt update && apt upgrade -y'
+    mode: '0644'

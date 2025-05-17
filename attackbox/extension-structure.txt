@@ -1,0 +1,23 @@
+extensions/
+└── ubuntu-servers/
+    ├── ansible/
+    │   ├── install.yml
+    │   └── roles/
+    │       └── ubuntu-setup/
+    │           ├── tasks/
+    │           │   └── main.yml
+    │           └── templates/
+    │               └── hosts.j2
+    ├── providers/
+    │   ├── aws/
+    │   │   └── linux.tf
+    │   ├── azure/
+    │   │   └── linux.tf
+    │   ├── proxmox/
+    │   │   └── linux.tf
+    │   ├── virtualbox/
+    │   │   └── Vagrantfile.rb
+    │   └── vmware/
+    │       └── Vagrantfile.rb
+    ├── inventory
+    └── extension.json

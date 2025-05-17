@@ -1,0 +1,26 @@
+[default]
+{% if provider_name == 'aws' or provider_name == 'azure' %}
+ubuntu-server-1 ansible_host={{ip_range}}.51 dict_key=ubuntu-server-1 ansible_user=ubuntu
+ubuntu-server-2 ansible_host={{ip_range}}.52 dict_key=ubuntu-server-2 ansible_user=ubuntu
+ubuntu-server-3 ansible_host={{ip_range}}.53 dict_key=ubuntu-server-3 ansible_user=ubuntu
+{% else %}
+ubuntu-server-1 ansible_host={{ip_range}}.51 dict_key=ubuntu-server-1
+ubuntu-server-2 ansible_host={{ip_range}}.52 dict_key=ubuntu-server-2
+ubuntu-server-3 ansible_host={{ip_range}}.53 dict_key=ubuntu-server-3
+{% endif %}
+
+[extensions]
+ubuntu-server-1
+ubuntu-server-2
+ubuntu-server-3
+
+; Recipe associations
+[ubuntu_servers]
+ubuntu-server-1
+ubuntu-server-2
+ubuntu-server-3
+
+[ubuntu_servers:vars]
+ansible_connection=ssh
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+ansible_python_interpreter=/usr/bin/python3

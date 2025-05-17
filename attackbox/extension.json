@@ -1,0 +1,14 @@
+{
+  "name": "Attack Boxes",
+  "description": "Add three Ubuntu 24.04 attack boxes to the GOAD lab environment",
+  "machines": [
+    "attackbox-1 (attackbox-1.{{lab_domain}})",
+    "attackbox-2 (attackbox-2.{{lab_domain}})",
+    "attackbox-3 (attackbox-3.{{lab_domain}})"
+  ],
+  "compatibility": [
+    "GOAD",
+    "GOAD-Light"
+  ],
+  "impact": "Adds three Ubuntu 24.04 attack boxes to the lab environment on the private network. These machines can be used for offensive security testing, running exploits, and penetration testing against the Active Directory environment."
+}
