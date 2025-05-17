@@ -95,6 +95,7 @@ sed -i "s|ami-[a-z0-9]*|${WIN_AMI}|g"  $WINDOWS_TF_PATH
 
 echo -e "${GREEN}Updated AMI IDs in windows.tf${NC}"
 
+# Need to update after the clone becasue AMIs differ by region
 echo -e "${YELLOW}Getting latest Ubuntu 24.04 LTS AMI for region ${AWS_REGION}...${NC}"
 UBUNTU_AMI=$(aws ec2 describe-images \
     --region "$AWS_REGION" \
@@ -122,7 +123,6 @@ echo -e "${YELLOW}Updating Windows AMI IDs in windows.tf...${NC}"
 sed -i "s|ami-[a-z0-9]*|${UBUNTU_AMI}|g"  $LINUX_TF_PATH
 
 echo -e "${GREEN}Updated AMI IDs in linux.tf${NC}"
-read -p "Press Enter to continue..."
 
 
 # Deploy GOAD Light with a Windows 10 workstation and attackboxes extension

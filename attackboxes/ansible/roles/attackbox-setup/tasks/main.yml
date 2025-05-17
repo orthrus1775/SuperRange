@@ -123,6 +123,7 @@
     - 9002
     - 9003
     - 9004
+    - 9005
   failed_when: fals
 
 - name: Enable UFW
