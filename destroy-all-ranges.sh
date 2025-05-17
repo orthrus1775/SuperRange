@@ -32,6 +32,12 @@ if [ "$INPUT_STRING" != "$CONFIRM_STRING" ]; then
     exit 1
 fi
 
+# Ask about file cleanup
+echo "After destroying the ranges, do you want to:"
+echo "1. Remove all files (complete cleanup)"
+echo "2. Keep files for reference"
+read -p "Enter your choice (1/2): " CLEANUP_CHOICE
+
 # Track destruction status
 echo "{\"destruction\": {\"start_time\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\", \"ranges\": {}}}" > destruction-status.json
 
@@ -75,10 +81,8 @@ for ((i=${#RANGES[@]}-1; i>=0; i--)); do
         echo "GOAD directory not found for $RANGE, skipping..."
     fi
     
-    # 3. Clean up range directory (optional)
-    read -p "Do you want to remove all files for $RANGE? (y/n) " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    # 3. Clean up range directory based on user choice
+    if [ "$CLEANUP_CHOICE" == "1" ]; then
         echo "Removing range directory..."
         rm -rf "$BASE_DIR/$RANGE"
         echo "Range directory removed."
@@ -95,8 +99,38 @@ done
 # Update final status
 jq ".destruction.end_time = \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\", .destruction.status = \"completed\"" destruction-status.json > temp.json && mv temp.json destruction-status.json
 
+# Clean up additional files
+if [ "$CLEANUP_CHOICE" == "1" ]; then
+    echo ""
+    echo "Performing complete cleanup..."
+    
+    # Remove dashboard
+    rm -rf "./dashboard"
+    echo "Dashboard removed."
+    
+    # Remove deployment status file
+    rm -f deployment-status.json
+    echo "Deployment status file removed."
+    
+    # Keep destruction status for reference
+    echo "Destruction status file kept at destruction-status.json"
+    
+    # Remove any temporary files
+    rm -f temp.json
+    
+    # If the ranges directory is empty, remove it
+    if [ -z "$(ls -A $BASE_DIR)" ]; then
+        rm -rf "$BASE_DIR"
+        echo "Empty ranges directory removed."
+    fi
+fi
 
 echo ""
 echo "=================================================="
 echo "All ranges destroyed successfully!"
+if [ "$CLEANUP_CHOICE" == "1" ]; then
+    echo "All files have been cleaned up."
+else
+    echo "Files have been kept for reference."
+fi
 echo "=================================================="

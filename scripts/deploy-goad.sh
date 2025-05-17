@@ -66,6 +66,35 @@ find . -name "windows.tf" -exec grep -l "ami-" {} \; | while read -r file; do
     sed -i "s/ami-[a-z0-9]\{17\}/$LATEST_WIN_AMI/g" "$file"
 done
 
+# Use AWS CLI to find the latest Ubuntu 22.04 AMI in the specified region
+
+# Canonical's official AWS account ID: 099720109477    
+LATEST_UBN_AMI=$(aws ec2 describe-images \
+    --owners 099720109477 \
+    --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" \
+              "Name=architecture,Values=x86_64" \
+              "Name=root-device-type,Values=ebs" \
+              "Name=virtualization-type,Values=hvm" \
+              "Name=state,Values=available" \
+    --query "sort_by(Images, &CreationDate)[-1].ImageId" \
+    --output text \
+    --region "$AWS_REGION")
+
+
+if [ -z "$LATEST_UBN_AMI" ]; then
+    echo "ERROR: Failed to retrieve latest Ubuntu 22.04 AMI. Check AWS CLI configuration."
+    exit 1
+fi
+
+echo "Latest Ubuntu 22.04 AMI for region $AWS_REGION: $LATEST_WIN_AMI"
+
+# Find and update all windows.tf files
+find . -name "jumpbox.tf" -exec grep -l "ami-" {} \; | while read -r file; do
+    echo "Updating AMI IDs in $file..."
+    # Replace any AMI ID that looks like ami-xxxxxxxxxxxxxxxxx with the latest one
+    sed -i "s/ami-[a-z0-9]\{17\}/$LATEST_UBN_AMI/g" "$file"
+done
+
 # Update GOAD-Light inventory to disable updates and Windows Defender
 INVENTORY_FILE="$GOAD_DIR/ad/GOAD-Light/data/inventory"
 if [ -f "$INVENTORY_FILE" ]; then
@@ -233,6 +262,6 @@ EOF
     return 0
 else
     echo "ERROR: GOAD-Light deployment failed. Check logs at: $LOGFILE"
-    
+
     return 1
 fi
