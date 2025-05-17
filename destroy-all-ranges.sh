@@ -106,6 +106,7 @@ if [ "$CLEANUP_CHOICE" == "1" ]; then
     
     # Remove dashboard
     rm -rf "./dashboard"
+    rm -r  ranges/dashboard/*
     echo "Dashboard removed."
     
     # Remove deployment status file
