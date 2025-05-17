@@ -1,7 +1,7 @@
-# Add Ubuntu server boxes
+# Add attack boxes
 boxes.append(
   {
-    :name => "{{lab_name}}-ubuntu-server-1",
+    :name => "{{lab_name}}-attackbox-1",
     :ip => "{{ip_range}}.51",
     :box => "bento/ubuntu-24.04",
     :os => "linux",
@@ -15,7 +15,7 @@ boxes.append(
 
 boxes.append(
   {
-    :name => "{{lab_name}}-ubuntu-server-2",
+    :name => "{{lab_name}}-attackbox-2",
     :ip => "{{ip_range}}.52",
     :box => "bento/ubuntu-24.04",
     :os => "linux",
@@ -29,7 +29,7 @@ boxes.append(
 
 boxes.append(
   {
-    :name => "{{lab_name}}-ubuntu-server-3",
+    :name => "{{lab_name}}-attackbox-3",
     :ip => "{{ip_range}}.53",
     :box => "bento/ubuntu-24.04",
     :os => "linux",

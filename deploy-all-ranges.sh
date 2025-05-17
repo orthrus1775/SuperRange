@@ -1,121 +1,143 @@
 #!/bin/bash
-# deploy-all-ranges.sh - Master script to deploy multiple GOAD ranges
 
-set -e # Exit on any error
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Set error handling
+set -e
+trap 'echo -e "${RED}Error: Command failed at line $LINENO${NC}"; exit 1' ERR
 
 # Configuration
-RANGES=("range1" "range2")
-BASE_DIR="./ranges"
-SCRIPT_DIR="./scripts"
+RANGES=(1 2 3) # Default: Deploy 3 ranges
+DEPLOYMENT_STATUS_FILE="deployment-status.json"
+GOAD_REPO="https://github.com/Orange-Cyberdefense/GOAD.git"
+GOAD_BRANCH="main"
+ATTACKBOXES_DIR="./attackboxes"
 
-# Display banner
-echo "=================================================="
-echo "  GOAD Multi-Range Deployment System"
-echo "=================================================="
-echo "- This script will deploy ${#RANGES[@]} independent ranges"
-echo "- Each range includes GOAD-Light and 3 Ubuntu servers"
-echo "- Estimated deployment time: 1-2 hours per range"
-echo ""
+# Ensure necessary directories exist
+mkdir -p ranges
+mkdir -p dashboard
 
-# Check for required tools
-echo "Checking prerequisites..."
-command -v aws >/dev/null 2>&1 || { echo "AWS CLI is required but not installed. Aborting."; exit 1; }
-command -v terraform >/dev/null 2>&1 || { echo "Terraform is required but not installed. Aborting."; exit 1; }
-command -v jq >/dev/null 2>&1 || { echo "jq is required but not installed. Aborting."; exit 1; }
-command -v git >/dev/null 2>&1 || { echo "git is required but not installed. Aborting."; exit 1; }
-
-# Prompt for confirmation
-read -p "This will deploy ${#RANGES[@]} ranges. Continue? (y/n) " -n 1 -r
-echo ""
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Deployment canceled."
-    exit 1
+# Initialize deployment status file if it doesn't exist
+if [ ! -f "$DEPLOYMENT_STATUS_FILE" ]; then
+    echo '{"ranges": {}}' > "$DEPLOYMENT_STATUS_FILE"
 fi
 
-# Prompt for AWS key pair to use
-read -p "Enter the AWS key pair name to use for all ranges: " KEY_PAIR
-if [ -z "$KEY_PAIR" ]; then
-    echo "Key pair name is required. Aborting."
-    exit 1
-fi
+# Function to update deployment status
+update_status() {
+    local range_id="$1"
+    local status="$2"
+    local details="$3"
+    
+    # Update the JSON file using jq
+    jq --arg id "$range_id" --arg status "$status" --arg details "$details" \
+       '.ranges[$id] = {"status": $status, "details": $details}' \
+       "$DEPLOYMENT_STATUS_FILE" > "${DEPLOYMENT_STATUS_FILE}.tmp" && \
+    mv "${DEPLOYMENT_STATUS_FILE}.tmp" "$DEPLOYMENT_STATUS_FILE"
+}
 
-# Prompt for AWS region
-read -p "Enter AWS region (default: us-east-1): " AWS_REGION
-AWS_REGION=${AWS_REGION:-us-east-1}
+# Check prerequisites
+check_prerequisites() {
+    echo -e "${GREEN}Checking prerequisites...${NC}"
+    
+    if ! command -v terraform &> /dev/null; then
+        echo -e "${RED}Error: Terraform is not installed.${NC}"
+        exit 1
+    fi
+    
+    if ! command -v jq &> /dev/null; then
+        echo -e "${RED}Error: jq is not installed.${NC}"
+        exit 1
+    fi
+    
+    if ! command -v aws &> /dev/null; then
+        echo -e "${RED}Error: AWS CLI is not installed.${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}All prerequisites are met.${NC}"
+}
 
-# Prompt for AWS availability zone
-read -p "Enter AWS availability zone (default: ${AWS_REGION}a): " AWS_AZ
-AWS_AZ=${AWS_AZ:-${AWS_REGION}a}
+# Get AWS configuration from user
+get_aws_config() {
+    echo -e "${GREEN}AWS Configuration${NC}"
+    
+    # Get AWS key pair
+    read -p "Enter AWS key pair name: " AWS_KEY_PAIR
+    
+    # Get AWS region
+    read -p "Enter AWS region (default: us-east-1): " AWS_REGION
+    AWS_REGION=${AWS_REGION:-us-east-1}
+    
+    # Export as environment variables
+    export TF_VAR_aws_key_pair="$AWS_KEY_PAIR"
+    export TF_VAR_aws_region="$AWS_REGION"
+    
+    echo -e "${GREEN}AWS configuration set.${NC}"
+}
 
-# Ensure base directory exists
-mkdir -p $BASE_DIR
+# Deploy a single range
+deploy_range() {
+    local range_id="$1"
+    local range_dir="ranges/range${range_id}"
+    
+    echo -e "${GREEN}Deploying Range ${range_id}...${NC}"
+    update_status "$range_id" "deploying" "Starting deployment"
+    
+    # Create range directory if it doesn't exist
+    mkdir -p "$range_dir"
+    
+    # Generate range configuration
+    ./scripts/generate-config.sh "$range_id"
+    
+    # Create GOAD directory if it doesn't exist
+    if [ ! -d "$range_dir/goad" ]; then
+        echo -e "${YELLOW}Cloning GOAD repository for Range ${range_id}...${NC}"
+        git clone --branch "$GOAD_BRANCH" "$GOAD_REPO" "$range_dir/goad"
+    else
+        echo -e "${YELLOW}GOAD repository already exists for Range ${range_id}. Pulling latest changes...${NC}"
+        (cd "$range_dir/goad" && git pull)
+    fi
 
-# Track deployment status
-echo "{\"ranges\": {}}" > deployment-status.json
+    # Create extensions directory if it doesn't exist
+    mkdir -p "$range_dir/goad/extensions"
+    
+    # Copy attackboxes extension to the range's GOAD extensions folder
+    echo -e "${YELLOW}Copying attackboxes extension to Range ${range_id}...${NC}"
+    cp -r "$ATTACKBOXES_DIR" "$range_dir/goad/extensions/"
+    
+    # Deploy GOAD with workstation and attackboxes for the range
+    echo -e "${YELLOW}Deploying GOAD with attackboxes for Range ${range_id}...${NC}"
+    ./scripts/deploy-goad.sh "$range_id"
+    
+    # Generate documentation for the range
+    echo -e "${YELLOW}Generating documentation for Range ${range_id}...${NC}"
+    ./scripts/generate-docs.sh "$range_id"
+    
+    update_status "$range_id" "deployed" "Deployment completed successfully"
+    echo -e "${GREEN}Range ${range_id} deployed successfully.${NC}"
+}
 
-# For each range
-for RANGE in "${RANGES[@]}"; do
-  echo ""
-  echo "=================================================="
-  echo "Setting up range: $RANGE"
-  echo "=================================================="
-  
-  # Update status
-  jq ".ranges[\"$RANGE\"] = {\"status\": \"initializing\", \"start_time\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" deployment-status.json > temp.json && mv temp.json deployment-status.json
-  
-  # 1. Create range directory structure
-  echo "Creating directory structure..."
-  mkdir -p "$BASE_DIR/$RANGE/goad"
-  mkdir -p "$BASE_DIR/$RANGE/ubuntu-servers"
-  mkdir -p "$BASE_DIR/$RANGE/docs"
-  
-  # 2. Generate range-specific configuration
-  echo "Generating range configuration..."
-  $SCRIPT_DIR/generate-config.sh "$RANGE" "$KEY_PAIR" "$AWS_REGION" "$AWS_AZ" > "$BASE_DIR/$RANGE/range-config.json"
-  
-  # 3. Deploy GOAD-Light
-  echo "Deploying GOAD-Light environment..."
-  if $SCRIPT_DIR/deploy-goad.sh "$RANGE" "$BASE_DIR"; then
-    # Update status
-    jq ".ranges[\"$RANGE\"].goad_status = \"deployed\"" deployment-status.json > temp.json && mv temp.json deployment-status.json
-    echo "GOAD-Light deployment completed for $RANGE"
-  else
-    # Update status
-    jq ".ranges[\"$RANGE\"].goad_status = \"failed\"" deployment-status.json > temp.json && mv temp.json deployment-status.json
-    echo "ERROR: GOAD-Light deployment failed for $RANGE"
-    continue
-  fi
-  
-  # 4. Deploy Ubuntu servers
-  echo "Deploying Ubuntu servers..."
-  if $SCRIPT_DIR/deploy-ubuntu.sh "$RANGE" "$BASE_DIR"; then
-    # Update status
-    jq ".ranges[\"$RANGE\"].ubuntu_status = \"deployed\"" deployment-status.json > temp.json && mv temp.json deployment-status.json
-    echo "Ubuntu servers deployment completed for $RANGE"
-  else
-    # Update status
-    jq ".ranges[\"$RANGE\"].ubuntu_status = \"failed\"" deployment-status.json > temp.json && mv temp.json deployment-status.json
-    echo "ERROR: Ubuntu servers deployment failed for $RANGE"
-  fi
-  
-  # 5. Generate documentation
-  echo "Generating documentation..."
-  $SCRIPT_DIR/generate-docs.sh "$RANGE" "$BASE_DIR"
-  
-  # Update status
-  jq ".ranges[\"$RANGE\"].status = \"completed\", .ranges[\"$RANGE\"].end_time = \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"" deployment-status.json > temp.json && mv temp.json deployment-status.json
-  
-  echo "Range $RANGE deployment complete"
-done
+# Main function to deploy all ranges
+deploy_all_ranges() {
+    check_prerequisites
+    get_aws_config
+    
+    echo -e "${GREEN}Deploying ${#RANGES[@]} ranges...${NC}"
+    
+    for range_id in "${RANGES[@]}"; do
+        deploy_range "$range_id"
+    done
+    
+    # Generate dashboard
+    ./scripts/generate-dashboard.sh
+    
+    echo -e "${GREEN}All ranges deployed successfully.${NC}"
+    echo -e "${GREEN}Dashboard generated at: ./dashboard/index.html${NC}"
+}
 
-# Generate consolidated dashboard
-echo ""
-echo "Generating dashboard..."
-$SCRIPT_DIR/generate-dashboard.sh "${RANGES[@]}" "$BASE_DIR"
-
-
-echo ""
-echo "=================================================="
-echo "All ranges deployed successfully!"
-echo "See dashboard.html for access information"
-echo "=================================================="
+# Run the main function
+deploy_all_ranges

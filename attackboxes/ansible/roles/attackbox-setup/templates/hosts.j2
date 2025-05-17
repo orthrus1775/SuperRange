@@ -2,7 +2,7 @@
 127.0.1.1 {{ ansible_hostname }}
 
 # GOAD environment hosts
-{% for host in groups['ubuntu_servers'] %}
+{% for host in groups['attackboxes'] %}
 {{ hostvars[host].ansible_host }} {{ host }}.{{ lab_domain }} {{ host }}
 {% endfor %}
 

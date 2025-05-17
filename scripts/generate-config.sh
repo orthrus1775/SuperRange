@@ -1,84 +1,86 @@
 #!/bin/bash
-# generate-config.sh - Generate range-specific configuration
 
-# Check arguments
-if [ $# -lt 4 ]; then
-    echo "Usage: $0 <range-id> <key-pair> <aws-region> <aws-az>"
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Set error handling
+set -e
+trap 'echo -e "${RED}Error: Command failed at line $LINENO${NC}"; exit 1' ERR
+
+# Check if range ID is provided
+if [ $# -lt 1 ]; then
+    echo -e "${RED}Error: Range ID is required.${NC}"
+    echo -e "Usage: $0 <range_id>"
     exit 1
 fi
 
-RANGE_ID=$1
-KEY_PAIR=$2
-AWS_REGION=$3
-AWS_AZ=$4
+RANGE_ID="$1"
+RANGE_DIR="ranges/range${RANGE_ID}"
+CONFIG_FILE="${RANGE_DIR}/range-config.json"
 
-# Generate a unique range number (1-254) from the range ID
-RANGE_NUM=$(echo $RANGE_ID | md5sum | tr -d -c 0-9 | head -c 3)
+# Get AWS region from environment variable or default to us-east-1
+AWS_REGION=${TF_VAR_aws_region:-us-east-1}
+AWS_KEY_PAIR=${TF_VAR_aws_key_pair:-"default"}
 
-RANGE_NUM=$((RANGE_NUM % 254 + 1))
+# Create range directory if it doesn't exist
+mkdir -p "$RANGE_DIR"
 
-# Generate unique CIDR blocks for the range
-GOAD_CIDR="192.168.${RANGE_NUM}.0/24"
-UBUNTU_CIDR="10.${RANGE_NUM}.0.0/16"
-UBUNTU_SUBNET="10.${RANGE_NUM}.1.0/24"
+echo -e "${GREEN}Generating configuration for Range ${RANGE_ID}...${NC}"
 
-# Generate Ubuntu instance IP addresses using the GOAD CIDR range
-# This will help ensure connectivity between Ubuntu and GOAD
-UBUNTU_IP_1="192.168.${RANGE_NUM}.80"
-UBUNTU_IP_2="192.168.${RANGE_NUM}.81"
-UBUNTU_IP_3="192.168.${RANGE_NUM}.82"
+# Calculate network configuration based on range ID
+VPC_CIDR="10.${RANGE_ID}.0.0/16"
+SUBNET_CIDR="10.${RANGE_ID}.1.0/24"
+GOAD_NETWORK="192.168.${RANGE_ID}.0/24"
 
-# Generate GOAD instance IP addresses
-GOAD_DC1_IP="192.168.${RANGE_NUM}.10"
-GOAD_DC2_IP="192.168.${RANGE_NUM}.11"
-GOAD_SRV_IP="192.168.${RANGE_NUM}.22"
-GOAD_WS01_IP="192.168.${RANGE_NUM}.31"
-
-# Create a JSON configuration
-cat <<EOF
+# Generate range-config.json
+cat > "$CONFIG_FILE" <<EOF
 {
-  "range_id": "${RANGE_ID}",
-  "range_number": ${RANGE_NUM},
+  "range_id": "range${RANGE_ID}",
+  "range_number": ${RANGE_ID},
   "aws_region": "${AWS_REGION}",
-  "aws_availability_zone": "${AWS_AZ}",
-  "key_name": "${KEY_PAIR}",
-  "instance_type": "t2.2xlarge",
-  "instance_count": 3,
-  "root_volume_size": 50,
-  "goad_cidr": "${GOAD_CIDR}",
-  "ubuntu_cidr": "${UBUNTU_CIDR}",
-  "ubuntu_subnet": "${UBUNTU_SUBNET}",
-  "ubuntu_ips": [
-    "${UBUNTU_IP_1}",
-    "${UBUNTU_IP_2}",
-    "${UBUNTU_IP_3}"
-  ],
-  "goad_ips": {
-    "dc1": "${GOAD_DC1_IP}",
-    "dc2": "${GOAD_DC2_IP}",
-    "srv": "${GOAD_SRV_IP}",
-    "ws01": "${GOAD_WS01_IP}"
+  "aws_key_pair": "${AWS_KEY_PAIR}",
+  "vpc_cidr": "${VPC_CIDR}",
+  "subnet_cidr": "${SUBNET_CIDR}",
+  "goad_network": "${GOAD_NETWORK}",
+  "desktop_environment": {
+    "enabled": true,
+    "type": "xfce"
   },
-  "goad_domains": {
-    "parent": "sevenkingdoms.local",
-    "child": "north.sevenkingdoms.local"
+  "rdp_access": {
+    "enabled": true,
+    "port": 3389
   },
-  "hostnames": {
-    "dc1": "kingslanding",
-    "dc2": "winterfell",
-    "srv": "castelblack",
-    "ws01": "desktop",
-    "ubuntu1": "${RANGE_ID}-ubuntu1",
-    "ubuntu2": "${RANGE_ID}-ubuntu2",
-    "ubuntu3": "${RANGE_ID}-ubuntu3"
+  "attackboxes": {
+    "count": 3,
+    "instance_type": "t2.2xlarge",
+    "ubuntu_version": "24.04",
+    "username": "ubuntu",
+    "password": "Password123!",
+    "ip_start": 80,
+    "tools": [
+      "nmap",
+      "metasploit-framework",
+      "wireshark",
+      "burpsuite",
+      "gobuster",
+      "exploitdb",
+      "bloodhound",
+      "powershell-empire",
+      "proxychains",
+      "python3-pip",
+      "git"
+    ]
   },
-  "enable_desktop": true,
-  "install_rdp": true,
   "tags": {
-    "Environment": "GOAD-Lab",
-    "RangeID": "${RANGE_ID}",
-    "Project": "GOAD-Multi-Range"
+    "Project": "SuperRange",
+    "Environment": "Training",
+    "RangeID": "range${RANGE_ID}"
   },
   "created_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 }
 EOF
+
+echo -e "${GREEN}Configuration generated for Range ${RANGE_ID} at ${CONFIG_FILE}${NC}"

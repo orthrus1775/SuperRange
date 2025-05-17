@@ -1,267 +1,152 @@
 #!/bin/bash
-# deploy-goad.sh - Deploy GOAD-Light for a specific range
 
-set -e # Exit on any error
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-# Check arguments
-if [ $# -lt 2 ]; then
-    echo "Usage: $0 <range-id> <base-dir>"
+# Set error handling
+set -e
+trap 'echo -e "${RED}Error: Command failed at line $LINENO${NC}"; exit 1' ERR
+
+# Check if range ID is provided
+if [ $# -lt 1 ]; then
+    echo -e "${RED}Error: Range ID is required.${NC}"
+    echo -e "Usage: $0 <range_id>"
     exit 1
 fi
 
-RANGE_ID=$1
-BASE_DIR=$2
-RANGE_DIR="${BASE_DIR}/${RANGE_ID}"
-GOAD_DIR="${RANGE_DIR}/goad"
+RANGE_ID="$1"
+RANGE_DIR="ranges/range${RANGE_ID}"
 CONFIG_FILE="${RANGE_DIR}/range-config.json"
+GOAD_DIR="${RANGE_DIR}/goad"
 
-# Check if configuration file exists
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Configuration file not found: $CONFIG_FILE"
+# Check if range directory exists
+if [ ! -d "$RANGE_DIR" ]; then
+    echo -e "${RED}Error: Range directory does not exist: $RANGE_DIR${NC}"
     exit 1
 fi
 
-# Load configuration
-RANGE_NUM=$(jq -r '.range_number' "$CONFIG_FILE")
-AWS_REGION=$(jq -r '.aws_region' "$CONFIG_FILE")
-GOAD_CIDR=$(jq -r '.goad_cidr' "$CONFIG_FILE")
-KEY_NAME=$(jq -r '.key_name' "$CONFIG_FILE")
-
-echo "Deploying GOAD-Light for range: $RANGE_ID (Range #$RANGE_NUM)"
-echo "- AWS Region: $AWS_REGION"
-echo "- GOAD CIDR: $GOAD_CIDR"
-echo "- Key Name: $KEY_NAME"
-
-# Clone GOAD repository if not already cloned
-if [ ! -d "${GOAD_DIR}/.git" ]; then
-    echo "Cloning GOAD repository..."
-    git clone https://github.com/Orange-Cyberdefense/GOAD.git "$GOAD_DIR"
+# Check if range configuration file exists
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo -e "${RED}Error: Range configuration file does not exist: $CONFIG_FILE${NC}"
+    exit 1
 fi
 
-# Navigate to GOAD directory
+# Check if GOAD directory exists
+if [ ! -d "$GOAD_DIR" ]; then
+    echo -e "${RED}Error: GOAD directory does not exist: $GOAD_DIR${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Deploying GOAD for Range ${RANGE_ID}...${NC}"
+
+# Get range configuration
+RANGE_NUMBER=$(jq -r '.range_number' "$CONFIG_FILE")
+AWS_REGION=$(jq -r '.aws_region' "$CONFIG_FILE")
+AWS_KEY_PAIR=$(jq -r '.aws_key_pair' "$CONFIG_FILE")
+
+# Get attackbox configuration
+ATTACKBOX_COUNT=$(jq -r '.attackboxes.count // 3' "$CONFIG_FILE")
+ATTACKBOX_INSTANCE_TYPE=$(jq -r '.attackboxes.instance_type // "t2.2xlarge"' "$CONFIG_FILE")
+ATTACKBOX_IP_START=$(jq -r '.attackboxes.ip_start // 80' "$CONFIG_FILE")
+
+# Change to GOAD directory
 cd "$GOAD_DIR"
 
-# Update Windows AMI IDs to the latest version
-echo "Finding latest Windows Server 2019 AMI for region $AWS_REGION..."
+# Set AWS environment variables
+export AWS_REGION="$AWS_REGION"
+export AWS_DEFAULT_REGION="$AWS_REGION"
+export TF_VAR_aws_key_name="$AWS_KEY_PAIR"
+export TF_VAR_range_number="$RANGE_NUMBER"
 
-# Use AWS CLI to find the latest Windows Server 2019 AMI in the specified region
-LATEST_WIN_AMI=$(aws ec2 describe-images \
+# Set attackbox environment variables
+export TF_VAR_attackbox_count="$ATTACKBOX_COUNT"
+export TF_VAR_attackbox_instance_type="$ATTACKBOX_INSTANCE_TYPE"
+export TF_VAR_attackbox_ip_start="$ATTACKBOX_IP_START"
+
+# Get the latest Windows Server 2019 AMI for the specified region
+echo -e "${YELLOW}Getting latest Windows Server 2019 AMI for region ${AWS_REGION}...${NC}"
+WIN_AMI=$(aws ec2 describe-images \
+    --region "$AWS_REGION" \
     --owners amazon \
-    --filters "Name=name,Values=Windows_Server-2019-English-Full-Base-*" "Name=state,Values=available" \
+    --filters "Name=name,Values=Windows_Server-2019-English-Full-Base-*" \
     --query "sort_by(Images, &CreationDate)[-1].ImageId" \
-    --output text \
-    --region "$AWS_REGION")
+    --output text)
 
-if [ -z "$LATEST_WIN_AMI" ]; then
-    echo "ERROR: Failed to retrieve latest Windows Server 2019 AMI. Check AWS CLI configuration."
+if [ -z "$WIN_AMI" ]; then
+    echo -e "${RED}Error: Could not find Windows Server 2019 AMI for region ${AWS_REGION}.${NC}"
     exit 1
 fi
 
-echo "Latest Windows Server 2019 AMI for region $AWS_REGION: $LATEST_WIN_AMI"
+echo -e "${GREEN}Found Windows Server 2019 AMI: ${WIN_AMI}${NC}"
 
-# Find and update all windows.tf files
-find . -name "windows.tf" -exec grep -l "ami-" {} \; | while read -r file; do
-    echo "Updating AMI IDs in $file..."
-    # Replace any AMI ID that looks like ami-xxxxxxxxxxxxxxxxx with the latest one
-    sed -i "s/ami-[a-z0-9]\{17\}/$LATEST_WIN_AMI/g" "$file"
-done
+# Update AMI IDs in aws.tf
+sed -i "s|ami = \".*\" # dc-2019|ami = \"${WIN_AMI}\" # dc-2019|g" aws/aws.tf
+sed -i "s|ami = \".*\" # srv-2019|ami = \"${WIN_AMI}\" # srv-2019|g" aws/aws.tf
+sed -i "s|ami = \".*\" # win10|ami = \"${WIN_AMI}\" # win10|g" aws/aws.tf
 
-# Use AWS CLI to find the latest Ubuntu 22.04 AMI in the specified region
+echo -e "${GREEN}Updated AMI IDs in aws.tf${NC}"
 
-# Canonical's official AWS account ID: 099720109477    
-LATEST_UBN_AMI=$(aws ec2 describe-images \
-    --owners 099720109477 \
-    --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" \
-              "Name=architecture,Values=x86_64" \
-              "Name=root-device-type,Values=ebs" \
-              "Name=virtualization-type,Values=hvm" \
-              "Name=state,Values=available" \
-    --query "sort_by(Images, &CreationDate)[-1].ImageId" \
-    --output text \
-    --region "$AWS_REGION")
+# Deploy GOAD Light with a Windows 10 workstation and attackboxes extension
+echo -e "${YELLOW}Deploying GOAD Light with Windows 10 workstation and attackboxes...${NC}"
+./goad.sh -t install -l GOAD-Light -p aws -m local -e ws01 attackboxes
 
-
-if [ -z "$LATEST_UBN_AMI" ]; then
-    echo "ERROR: Failed to retrieve latest Ubuntu 22.04 AMI. Check AWS CLI configuration."
-    exit 1
-fi
-
-echo "Latest Ubuntu 22.04 AMI for region $AWS_REGION: $LATEST_WIN_AMI"
-
-# Find and update all windows.tf files
-find . -name "jumpbox.tf" -exec grep -l "ami-" {} \; | while read -r file; do
-    echo "Updating AMI IDs in $file..."
-    # Replace any AMI ID that looks like ami-xxxxxxxxxxxxxxxxx with the latest one
-    sed -i "s/ami-[a-z0-9]\{17\}/$LATEST_UBN_AMI/g" "$file"
-done
-
-# Update GOAD-Light inventory to disable updates and Windows Defender
-INVENTORY_FILE="$GOAD_DIR/ad/GOAD-Light/data/inventory"
-if [ -f "$INVENTORY_FILE" ]; then
-    echo "Updating GOAD inventory to speed up deployment..."
-    # Create backup of the original inventory
-    cp "$INVENTORY_FILE" "${INVENTORY_FILE}.bak"
-    
-    # Clear hosts from [update] section and add them to [no_update]
-    sed -i '/\[update\]/,/\[no_update\]/ {
-        # Delete non-comment lines between sections
-        /^\[update\]/b
-        /^\[no_update\]/b
-        /^;/b
-        /^$/b
-        d
-    }' "$INVENTORY_FILE"
-    
-    # Add all hosts to [no_update] section
-    sed -i '/\[no_update\]/a dc01\ndc02\nsrv02\nws01' "$INVENTORY_FILE"
-    
-    # Clear hosts from [defender_on] section
-    sed -i '/\[defender_on\]/,/\[defender_off\]/ {
-        # Delete non-comment lines between sections
-        /^\[defender_on\]/b
-        /^\[defender_off\]/b
-        /^;/b
-        /^$/b
-        d
-    }' "$INVENTORY_FILE"
-    
-    # Add all hosts to [defender_off] section
-    sed -i '/\[defender_off\]/a dc01\ndc02\nsrv02\nws01' "$INVENTORY_FILE"
-    
-    echo "Inventory updated to disable all updates and Windows Defender."
-else
-    echo "Warning: GOAD inventory file not found at $INVENTORY_FILE"
-fi
-
-# Create GOAD configuration for AWS
-echo "Creating GOAD configuration for AWS..."
-
-# Create .goad directory if it doesn't exist
-mkdir -p ~/.goad
-
-# Create GOAD configuration file with range-specific settings
-cat > ~/.goad/goad.ini <<EOF
-[default]
-lab = GOAD-Light
-provider = aws
-provisioner = local
-ip_range = 192.168.${RANGE_NUM}
-
-[aws]
-aws_region = ${AWS_REGION}
-aws_zone = ${AWS_REGION}a
-EOF
-
-# Create custom settings for GOAD-Light
-mkdir -p "$GOAD_DIR/custom_settings"
-cat > "$GOAD_DIR/custom_settings/goad-light-${RANGE_ID}.ini" <<EOF
-[defaults]
-ansible_user = vagrant
-ansible_password = vagrant
-ansible_connection = winrm
-ansible_winrm_server_cert_validation = ignore
-ansible_winrm_operation_timeout_sec = 60
-ansible_winrm_read_timeout_sec = 70
-
-[all:vars]
-domain_name = sevenkingdoms.local
-domain_admin = Administrator
-domain_password = Password123!
-parent_domain = sevenkingdoms.local
-child_domain = north.sevenkingdoms.local
-domain_mode = forest
-install_tools = yes
-
-[ip]
-first_ip = 192.168.${RANGE_NUM}
-EOF
-
-# Ensure AWS CLI is configured
-if ! aws configure list &>/dev/null; then
-    echo "ERROR: AWS CLI is not configured. Please run 'aws configure' first."
-    exit 1
-fi
-
-# Check AWS permissions
-echo "Checking AWS permissions..."
-if ! aws ec2 describe-regions --region "$AWS_REGION" &>/dev/null; then
-    echo "ERROR: Unable to access AWS. Check your credentials and permissions."
-    exit 1
-fi
-
-# Deploy GOAD-Light to AWS
-echo "Deploying GOAD-Light to AWS (this may take 30+ minutes)..."
-echo "Starting deployment at: $(date)"
-
-# Create a log file
-LOGFILE="${RANGE_DIR}/goad-deployment.log"
-touch "$LOGFILE"
-
-# Run GOAD deployment
-echo "Running GOAD deployment (logging to $LOGFILE)..."
-(
-    set -x # Echo commands for logging
-    # Install Python venv if needed
-    if ! command -v python3 -m venv &>/dev/null; then
-        apt-get update
-        apt-get install -y python3-venv
-    fi
-    
-    # Run GOAD deployment command
-    ./goad.sh -t install -l GOAD-Light -p aws -m local -e ws01
-) 2>&1 | tee -a "$LOGFILE"
+# Wait for deployment to complete
+echo -e "${GREEN}GOAD deployment started. Waiting for completion...${NC}"
 
 # Check if deployment was successful
-if [ ${PIPESTATUS[0]} -eq 0 ]; then
-    echo "GOAD-Light deployment completed successfully at: $(date)"
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}GOAD deployed successfully for Range ${RANGE_ID}.${NC}"
     
-    # Extract and save GOAD information
-    echo "Extracting GOAD deployment information..."
+    # Extract and save IPs to range configuration
+    echo -e "${YELLOW}Extracting IPs and updating range configuration...${NC}"
     
-    # Save IP addresses
-    aws ec2 describe-instances \
-        --region "$AWS_REGION" \
-        --filters "Name=tag:Environment,Values=GOAD-Light" \
-        --query 'Reservations[*].Instances[*].[InstanceId,PrivateIpAddress,PublicIpAddress,Tags[?Key==`Name`].Value]' \
-        --output json > "${RANGE_DIR}/goad-instances.json"
+    # Get IPs from terraform output
+    KINGSLANDING_IP=$(terraform output -json kingslanding_ip | tr -d '"')
+    WINTERFELL_IP=$(terraform output -json winterfell_ip | tr -d '"')
+    CASTELBLACK_IP=$(terraform output -json castelblack_ip | tr -d '"')
+    DESKTOP_IP=$(terraform output -json desktop_ip | tr -d '"')
     
-    echo "GOAD-Light deployment information saved to: ${RANGE_DIR}/goad-instances.json"
+    KINGSLANDING_PUBLIC_IP=$(terraform output -json kingslanding_public_ip | tr -d '"')
+    WINTERFELL_PUBLIC_IP=$(terraform output -json winterfell_public_ip | tr -d '"')
+    CASTELBLACK_PUBLIC_IP=$(terraform output -json castelblack_public_ip | tr -d '"')
+    DESKTOP_PUBLIC_IP=$(terraform output -json desktop_public_ip | tr -d '"')
     
-    # Create a summary file
-    cat > "${RANGE_DIR}/goad-summary.txt" <<EOF
-GOAD-Light Deployment Summary for Range: ${RANGE_ID}
-===================================================
-Deployment completed at: $(date)
-AWS Region: ${AWS_REGION}
-GOAD CIDR: ${GOAD_CIDR}
-
-Domain Information:
-- Parent Domain: sevenkingdoms.local
-- Child Domain: north.sevenkingdoms.local
-- Domain Admin: Administrator
-- Password: Password123!
-
-Server Information:
-- DC1 (kingslanding): 192.168.${RANGE_NUM}.10
-- DC2 (winterfell): 192.168.${RANGE_NUM}.11
-- SRV (castelblack): 192.168.${RANGE_NUM}.22
-- WS01 (desktop): 192.168.${RANGE_NUM}.31
-
-To connect using RDP:
-- Use an RDP client to connect to the public IP addresses
-- Username: Administrator
-- Password: Password123!
-EOF
+    # Get attackboxes IPs
+    ATTACKBOXES_IPS=$(terraform output -json attackboxes_ips 2>/dev/null || echo '["N/A"]')
+    ATTACKBOXES_PUBLIC_IPS=$(terraform output -json attackboxes_public_ips 2>/dev/null || echo '["N/A"]')
     
-    # Extract and append public IPs to summary
-    echo "" >> "${RANGE_DIR}/goad-summary.txt"
-    echo "Public IP Addresses:" >> "${RANGE_DIR}/goad-summary.txt"
-    jq -r '.[][] | select(.[3][0] != null) | "\(.[3][0]): \(.[2])"' "${RANGE_DIR}/goad-instances.json" >> "${RANGE_DIR}/goad-summary.txt"
+    # Update range configuration with IPs
+    cd - > /dev/null  # Go back to previous directory
     
-    echo "GOAD-Light deployment summary saved to: ${RANGE_DIR}/goad-summary.txt"
-    return 0
+    # Update with GOAD IPs
+    jq --arg k_ip "$KINGSLANDING_IP" \
+       --arg w_ip "$WINTERFELL_IP" \
+       --arg c_ip "$CASTELBLACK_IP" \
+       --arg d_ip "$DESKTOP_IP" \
+       --arg k_pub "$KINGSLANDING_PUBLIC_IP" \
+       --arg w_pub "$WINTERFELL_PUBLIC_IP" \
+       --arg c_pub "$CASTELBLACK_PUBLIC_IP" \
+       --arg d_pub "$DESKTOP_PUBLIC_IP" \
+       --argjson a_ips "$ATTACKBOXES_IPS" \
+       --argjson a_pubs "$ATTACKBOXES_PUBLIC_IPS" \
+       '.goad = {
+          "kingslanding_ip": $k_ip,
+          "winterfell_ip": $w_ip,
+          "castelblack_ip": $c_ip,
+          "desktop_ip": $d_ip,
+          "kingslanding_public_ip": $k_pub,
+          "winterfell_public_ip": $w_pub,
+          "castelblack_public_ip": $c_pub,
+          "desktop_public_ip": $d_pub
+        } | .attackboxes.deployed_ips = $a_ips | .attackboxes.deployed_public_ips = $a_pubs' \
+       "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && \
+    mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+    
+    echo -e "${GREEN}Range configuration updated with IPs.${NC}"
 else
-    echo "ERROR: GOAD-Light deployment failed. Check logs at: $LOGFILE"
-
-    return 1
+    echo -e "${RED}Error: GOAD deployment failed for Range ${RANGE_ID}.${NC}"
+    exit 1
 fi

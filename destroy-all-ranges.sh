@@ -1,137 +1,100 @@
 #!/bin/bash
-# destroy-all-ranges.sh - Script to destroy all deployed ranges
 
-set -e # Exit on any error
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Set error handling
+set -e
+trap 'echo -e "${RED}Error: Command failed at line $LINENO${NC}"; exit 1' ERR
 
 # Configuration
-RANGES=("range1" "range2" "range3" "range4" "range5" "range6")
-BASE_DIR="./ranges"
-SCRIPT_DIR="./scripts"
+DEPLOYMENT_STATUS_FILE="deployment-status.json"
 
-# Display banner
-echo "=================================================="
-echo "  GOAD Multi-Range Destruction System"
-echo "=================================================="
-echo "- This script will DESTROY ${#RANGES[@]} independent ranges"
-echo "- ALL resources will be terminated and data will be LOST"
-echo "- This action is IRREVERSIBLE"
-echo ""
-
-# Check for required tools
-echo "Checking prerequisites..."
-command -v aws >/dev/null 2>&1 || { echo "AWS CLI is required but not installed. Aborting."; exit 1; }
-command -v terraform >/dev/null 2>&1 || { echo "Terraform is required but not installed. Aborting."; exit 1; }
-
-# Prompt for confirmation with range ID typing
-CONFIRM_STRING="DESTROY-ALL-RANGES"
-echo "This operation will destroy all ranges and cannot be undone."
-echo "To confirm, type '$CONFIRM_STRING' (case sensitive):"
-read INPUT_STRING
-if [ "$INPUT_STRING" != "$CONFIRM_STRING" ]; then
-    echo "Destruction canceled. Input did not match '$CONFIRM_STRING'"
-    exit 1
-fi
-
-# Ask about file cleanup
-echo "After destroying the ranges, do you want to:"
-echo "1. Remove all files (complete cleanup)"
-echo "2. Keep files for reference"
-read -p "Enter your choice (1/2): " CLEANUP_CHOICE
-
-# Track destruction status
-echo "{\"destruction\": {\"start_time\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\", \"ranges\": {}}}" > destruction-status.json
-
-# Destroy ranges in reverse order (in case of dependencies)
-for ((i=${#RANGES[@]}-1; i>=0; i--)); do
-    RANGE=${RANGES[i]}
+# Function to update deployment status
+update_status() {
+    local range_id="$1"
+    local status="$2"
+    local details="$3"
     
-    echo ""
-    echo "=================================================="
-    echo "Destroying range: $RANGE"
-    echo "=================================================="
+    # Update the JSON file using jq
+    jq --arg id "$range_id" --arg status "$status" --arg details "$details" \
+       '.ranges[$id] = {"status": $status, "details": $details}' \
+       "$DEPLOYMENT_STATUS_FILE" > "${DEPLOYMENT_STATUS_FILE}.tmp" && \
+    mv "${DEPLOYMENT_STATUS_FILE}.tmp" "$DEPLOYMENT_STATUS_FILE"
+}
+
+# Destroy a single range
+destroy_range() {
+    local range_id="$1"
+    local range_dir="ranges/range${range_id}"
     
-    # Update status
-    jq ".destruction.ranges[\"$RANGE\"] = {\"status\": \"destroying\"}" destruction-status.json > temp.json && mv temp.json destruction-status.json
+    echo -e "${GREEN}Destroying Range ${range_id}...${NC}"
     
-    # 1. Destroy Ubuntu servers first
-    echo "Destroying Ubuntu servers..."
-    if [ -d "$BASE_DIR/$RANGE/ubuntu-servers" ]; then
-        if $SCRIPT_DIR/destroy-ubuntu.sh "$RANGE" "$BASE_DIR"; then
-            jq ".destruction.ranges[\"$RANGE\"].ubuntu_status = \"destroyed\"" destruction-status.json > temp.json && mv temp.json destruction-status.json
-            echo "Ubuntu servers destroyed for $RANGE"
-        else
-            jq ".destruction.ranges[\"$RANGE\"].ubuntu_status = \"failed\"" destruction-status.json > temp.json && mv temp.json destruction-status.json
-            echo "ERROR: Failed to destroy Ubuntu servers for $RANGE"
-        fi
-    else
-        echo "Ubuntu servers directory not found for $RANGE, skipping..."
+    if [ ! -d "$range_dir" ]; then
+        echo -e "${YELLOW}Range ${range_id} directory does not exist. Skipping.${NC}"
+        return 0
     fi
     
-    # 2. Destroy GOAD-Light
-    echo "Destroying GOAD-Light environment..."
-    if [ -d "$BASE_DIR/$RANGE/goad" ]; then
-        if $SCRIPT_DIR/destroy-goad.sh "$RANGE" "$BASE_DIR"; then
-            jq ".destruction.ranges[\"$RANGE\"].goad_status = \"destroyed\"" destruction-status.json > temp.json && mv temp.json destruction-status.json
-            echo "GOAD-Light destroyed for $RANGE"
-        else
-            jq ".destruction.ranges[\"$RANGE\"].goad_status = \"failed\"" destruction-status.json > temp.json && mv temp.json destruction-status.json
-            echo "ERROR: Failed to destroy GOAD-Light for $RANGE"
-        fi
-    else
-        echo "GOAD directory not found for $RANGE, skipping..."
-    fi
+    update_status "$range_id" "destroying" "Starting destruction"
     
-    # 3. Clean up range directory based on user choice
-    if [ "$CLEANUP_CHOICE" == "1" ]; then
-        echo "Removing range directory..."
-        rm -rf "$BASE_DIR/$RANGE"
-        echo "Range directory removed."
+    # Destroy GOAD for the range (including attackboxes)
+    echo -e "${YELLOW}Destroying GOAD for Range ${range_id}...${NC}"
+    if [ -d "$range_dir/goad" ]; then
+        ./scripts/destroy-goad.sh "$range_id"
     else
-        echo "Range directory kept for reference."
+        echo -e "${YELLOW}No GOAD deployment found for Range ${range_id}. Skipping.${NC}"
     fi
     
     # Update status
-    jq ".destruction.ranges[\"$RANGE\"].status = \"completed\"" destruction-status.json > temp.json && mv temp.json destruction-status.json
-    
-    echo "Range $RANGE destruction complete"
-done
+    update_status "$range_id" "destroyed" "Destruction completed successfully"
+    echo -e "${GREEN}Range ${range_id} destroyed successfully.${NC}"
+}
 
-# Update final status
-jq ".destruction.end_time = \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\", .destruction.status = \"completed\"" destruction-status.json > temp.json && mv temp.json destruction-status.json
-
-# Clean up additional files
-if [ "$CLEANUP_CHOICE" == "1" ]; then
-    echo ""
-    echo "Performing complete cleanup..."
+# Main function to destroy all ranges
+destroy_all_ranges() {
+    echo -e "${GREEN}Preparing to destroy all ranges...${NC}"
     
-    # Remove dashboard
-    rm -rf "./dashboard"
-    rm -r  ranges/dashboard/*
-    echo "Dashboard removed."
-    
-    # Remove deployment status file
-    rm -f deployment-status.json
-    echo "Deployment status file removed."
-    
-    # Keep destruction status for reference
-    echo "Destruction status file kept at destruction-status.json"
-    
-    # Remove any temporary files
-    rm -f temp.json
-    
-    # If the ranges directory is empty, remove it
-    if [ -z "$(ls -A $BASE_DIR)" ]; then
-        rm -rf "$BASE_DIR"
-        echo "Empty ranges directory removed."
+    # Get all deployed ranges from status file
+    if [ -f "$DEPLOYMENT_STATUS_FILE" ]; then
+        RANGES=$(jq -r '.ranges | keys[]' "$DEPLOYMENT_STATUS_FILE")
+    else
+        echo -e "${YELLOW}No deployment status file found. Scanning ranges directory...${NC}"
+        RANGES=$(find ranges -maxdepth 1 -name "range*" | sed 's/.*range//')
     fi
-fi
+    
+    if [ -z "$RANGES" ]; then
+        echo -e "${YELLOW}No ranges found to destroy.${NC}"
+        exit 0
+    fi
+    
+    echo -e "${YELLOW}The following ranges will be destroyed:${NC}"
+    for range_id in $RANGES; do
+        echo -e "  - Range $range_id"
+    done
+    
+    # Ask for confirmation
+    read -p "Are you sure you want to destroy these ranges? (y/n): " confirm
+    if [ "$confirm" != "y" ]; then
+        echo -e "${YELLOW}Destruction cancelled.${NC}"
+        exit 0
+    fi
+    
+    # Destroy each range
+    for range_id in $RANGES; do
+        destroy_range "$range_id"
+    done
+    
+    echo -e "${GREEN}All ranges destroyed successfully.${NC}"
+    
+    # Update dashboard
+    if [ -f "./scripts/generate-dashboard.sh" ]; then
+        ./scripts/generate-dashboard.sh
+        echo -e "${GREEN}Dashboard updated at: ./dashboard/index.html${NC}"
+    fi
+}
 
-echo ""
-echo "=================================================="
-echo "All ranges destroyed successfully!"
-if [ "$CLEANUP_CHOICE" == "1" ]; then
-    echo "All files have been cleaned up."
-else
-    echo "Files have been kept for reference."
-fi
-echo "=================================================="
+# Run the main function
+destroy_all_ranges

@@ -1,9 +1,9 @@
 extensions/
-└── ubuntu-servers/
+└── attackboxes/
     ├── ansible/
     │   ├── install.yml
     │   └── roles/
-    │       └── ubuntu-setup/
+    │       └── attackbox-setup/
     │           ├── tasks/
     │           │   └── main.yml
     │           └── templates/
@@ -20,4 +20,5 @@ extensions/
     │   └── vmware/
     │       └── Vagrantfile.rb
     ├── inventory
-    └── extension.json
+    ├── extension.json
+    └── README.md

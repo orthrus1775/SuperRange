@@ -1,201 +1,79 @@
 #!/bin/bash
-# destroy-goad.sh - Destroy GOAD-Light for a specific range
 
-set -e # Exit on any error
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-# Check arguments
-if [ $# -lt 2 ]; then
-    echo "Usage: $0 <range-id> <base-dir>"
+# Set error handling
+set -e
+trap 'echo -e "${RED}Error: Command failed at line $LINENO${NC}"; exit 1' ERR
+
+# Check if range ID is provided
+if [ $# -lt 1 ]; then
+    echo -e "${RED}Error: Range ID is required.${NC}"
+    echo -e "Usage: $0 <range_id>"
     exit 1
 fi
 
-RANGE_ID=$1
-BASE_DIR=$2
-RANGE_DIR="${BASE_DIR}/${RANGE_ID}"
+RANGE_ID="$1"
+RANGE_DIR="ranges/range${RANGE_ID}"
+CONFIG_FILE="${RANGE_DIR}/range-config.json"
 GOAD_DIR="${RANGE_DIR}/goad"
+
+# Check if range directory exists
+if [ ! -d "$RANGE_DIR" ]; then
+    echo -e "${RED}Error: Range directory does not exist: $RANGE_DIR${NC}"
+    exit 1
+fi
 
 # Check if GOAD directory exists
 if [ ! -d "$GOAD_DIR" ]; then
-    echo "GOAD directory not found: $GOAD_DIR"
-    exit 1
+    echo -e "${YELLOW}GOAD directory does not exist: $GOAD_DIR. Skipping destruction.${NC}"
+    exit 0
 fi
 
-echo "Destroying GOAD-Light for range: $RANGE_ID"
+echo -e "${GREEN}Destroying GOAD for Range ${RANGE_ID}...${NC}"
 
-# Navigate to GOAD directory
+# Check if terraform.tfstate exists
+if [ ! -f "${GOAD_DIR}/terraform.tfstate" ]; then
+    echo -e "${YELLOW}No terraform state found in GOAD directory. Skipping destruction.${NC}"
+    exit 0
+fi
+
+# Get range configuration for AWS settings
+if [ -f "$CONFIG_FILE" ]; then
+    AWS_REGION=$(jq -r '.aws_region // "us-east-1"' "$CONFIG_FILE")
+    AWS_KEY_PAIR=$(jq -r '.aws_key_pair // "default"' "$CONFIG_FILE")
+    
+    # Set AWS environment variables
+    export AWS_REGION="$AWS_REGION"
+    export AWS_DEFAULT_REGION="$AWS_REGION"
+    export TF_VAR_aws_key_name="$AWS_KEY_PAIR"
+else
+    echo -e "${YELLOW}Range configuration file not found: $CONFIG_FILE. Using default AWS settings.${NC}"
+fi
+
+# Change to GOAD directory
 cd "$GOAD_DIR"
 
-# Create a log file
-LOGFILE="${RANGE_DIR}/goad-destruction.log"
-touch "$LOGFILE"
+# Destroy GOAD
+echo -e "${YELLOW}Destroying GOAD deployment (including attackboxes extension)...${NC}"
+./goad.sh -t destroy -p aws -m local
 
-# Check if GOAD instances information exists
-if [ -f "${RANGE_DIR}/goad-instances.json" ]; then
-    echo "Found GOAD instances information..."
+# Check if destruction was successful
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}GOAD destroyed successfully for Range ${RANGE_ID}.${NC}"
     
-    # Extract GOAD instance IDs
-    INSTANCE_IDS=$(jq -r '.[][][0]' "${RANGE_DIR}/goad-instances.json" | tr '\n' ' ')
-    
-    if [ -n "$INSTANCE_IDS" ]; then
-        echo "Found instance IDs: $INSTANCE_IDS"
-        
-        # Prompt for confirmation
-        read -p "Terminate these instances? (y/n) " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            # Get configuration
-            CONFIG_FILE="${RANGE_DIR}/range-config.json"
-            if [ -f "$CONFIG_FILE" ]; then
-                AWS_REGION=$(jq -r '.aws_region' "$CONFIG_FILE")
-            else
-                # Default region if config not found
-                AWS_REGION="us-east-1"
-            fi
-            
-            # Terminate instances
-            echo "Terminating instances in region $AWS_REGION..."
-            for INSTANCE_ID in $INSTANCE_IDS; do
-                echo "Terminating instance: $INSTANCE_ID"
-                aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" --region "$AWS_REGION" | tee -a "$LOGFILE"
-            done
-            
-            # Wait for instances to terminate
-            echo "Waiting for instances to terminate..."
-            for INSTANCE_ID in $INSTANCE_IDS; do
-                aws ec2 wait instance-terminated --instance-ids "$INSTANCE_ID" --region "$AWS_REGION"
-                echo "Instance $INSTANCE_ID terminated."
-            done
-        else
-            echo "Instance termination aborted."
-            return 1
-        fi
-    else
-        echo "No instance IDs found in ${RANGE_DIR}/goad-instances.json"
-    fi
-fi
-
-# Run GOAD destroy command if available
-if [ -f "./goad.sh" ]; then
-    echo "Running GOAD destroy command..."
-    
-    # Ensure .goad directory exists
-    mkdir -p ~/.goad
-    
-    # Get configuration
-    CONFIG_FILE="${RANGE_DIR}/range-config.json"
+    # Update range configuration to remove IPs if the config file exists
     if [ -f "$CONFIG_FILE" ]; then
-        RANGE_NUM=$(jq -r '.range_number' "$CONFIG_FILE")
-        AWS_REGION=$(jq -r '.aws_region' "$CONFIG_FILE")
-        
-        # Create GOAD configuration
-        cat > ~/.goad/goad.ini <<EOF
-[default]
-lab = GOAD-Light
-provider = aws
-provisioner = local
-ip_range = 192.168.${RANGE_NUM}
-
-[aws]
-aws_region = ${AWS_REGION}
-aws_zone = ${AWS_REGION}a
-EOF
+        cd - > /dev/null  # Go back to previous directory
+        jq 'del(.goad) | del(.attackboxes.deployed_ips) | del(.attackboxes.deployed_public_ips)' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && \
+        mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+        echo -e "${GREEN}Range configuration updated to remove IPs.${NC}"
     fi
-    
-    # Run GOAD destroy
-    ./goad.sh -t destroy -l GOAD-Light -p aws | tee -a "$LOGFILE"
+else
+    echo -e "${RED}Error: GOAD destruction failed for Range ${RANGE_ID}.${NC}"
+    exit 1
 fi
-
-# Create a record of the destruction
-cat > "${RANGE_DIR}/goad-destroyed.txt" <<EOF
-GOAD-Light Destruction for Range: ${RANGE_ID}
-=============================================
-Destroyed at: $(date)
-EOF
-
-# Cleanup additional AWS resources that might be left behind
-if [ -f "$CONFIG_FILE" ]; then
-    AWS_REGION=$(jq -r '.aws_region' "$CONFIG_FILE")
-    
-    echo "Checking for leftover AWS resources in region $AWS_REGION..."
-    
-    # Look for resources with the RangeID tag
-    echo "Looking for EC2 resources with tag RangeID=$RANGE_ID..."
-    
-    # Find and terminate any remaining instances
-    INSTANCES=$(aws ec2 describe-instances \
-        --region "$AWS_REGION" \
-        --filters "Name=tag:RangeID,Values=$RANGE_ID" "Name=instance-state-name,Values=running,pending,stopping,stopped" \
-        --query 'Reservations[*].Instances[*].InstanceId' \
-        --output text)
-    
-    if [ -n "$INSTANCES" ]; then
-        echo "Found leftover instances: $INSTANCES"
-        aws ec2 terminate-instances --instance-ids $INSTANCES --region "$AWS_REGION" | tee -a "$LOGFILE"
-        echo "Waiting for instances to terminate..."
-        aws ec2 wait instance-terminated --instance-ids $INSTANCES --region "$AWS_REGION"
-    fi
-    
-    # Find and delete any security groups
-    SECURITY_GROUPS=$(aws ec2 describe-security-groups \
-        --region "$AWS_REGION" \
-        --filters "Name=tag:RangeID,Values=$RANGE_ID" \
-        --query 'SecurityGroups[*].GroupId' \
-        --output text)
-    
-    if [ -n "$SECURITY_GROUPS" ]; then
-        echo "Found leftover security groups: $SECURITY_GROUPS"
-        for SG in $SECURITY_GROUPS; do
-            echo "Deleting security group: $SG"
-            aws ec2 delete-security-group --group-id "$SG" --region "$AWS_REGION" | tee -a "$LOGFILE"
-        done
-    fi
-    
-    # Find and delete any VPCs
-    VPCS=$(aws ec2 describe-vpcs \
-        --region "$AWS_REGION" \
-        --filters "Name=tag:RangeID,Values=$RANGE_ID" \
-        --query 'Vpcs[*].VpcId' \
-        --output text)
-    
-    if [ -n "$VPCS" ]; then
-        echo "Found leftover VPCs: $VPCS"
-        for VPC in $VPCS; do
-            # Delete associated subnets
-            SUBNETS=$(aws ec2 describe-subnets \
-                --region "$AWS_REGION" \
-                --filters "Name=vpc-id,Values=$VPC" \
-                --query 'Subnets[*].SubnetId' \
-                --output text)
-            
-            if [ -n "$SUBNETS" ]; then
-                echo "Deleting subnets for VPC $VPC: $SUBNETS"
-                for SUBNET in $SUBNETS; do
-                    aws ec2 delete-subnet --subnet-id "$SUBNET" --region "$AWS_REGION" | tee -a "$LOGFILE"
-                done
-            fi
-            
-            # Delete associated internet gateways
-            IGWs=$(aws ec2 describe-internet-gateways \
-                --region "$AWS_REGION" \
-                --filters "Name=attachment.vpc-id,Values=$VPC" \
-                --query 'InternetGateways[*].InternetGatewayId' \
-                --output text)
-            
-            if [ -n "$IGWs" ]; then
-                echo "Detaching and deleting internet gateways for VPC $VPC: $IGWs"
-                for IGW in $IGWs; do
-                    aws ec2 detach-internet-gateway --internet-gateway-id "$IGW" --vpc-id "$VPC" --region "$AWS_REGION" | tee -a "$LOGFILE"
-                    aws ec2 delete-internet-gateway --internet-gateway-id "$IGW" --region "$AWS_REGION" | tee -a "$LOGFILE"
-                done
-            fi
-            
-            # Delete the VPC
-            echo "Deleting VPC: $VPC"
-            aws ec2 delete-vpc --vpc-id "$VPC" --region "$AWS_REGION" | tee -a "$LOGFILE"
-        done
-    fi
-fi
-
-echo "GOAD-Light environment destroyed successfully for range: $RANGE_ID"
-
-return 0

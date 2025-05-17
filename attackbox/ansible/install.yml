@@ -1,7 +1,0 @@
----
-# Ubuntu Servers Extension Installation Playbook
-- name: Configure Ubuntu servers
-  hosts: ubuntu_servers
-  become: yes
-  roles:
-    - { role: 'ubuntu-setup', tags: 'ubuntu-setup' }
