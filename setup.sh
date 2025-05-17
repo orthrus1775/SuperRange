@@ -1,5 +1,5 @@
 #!/bin/bash
-# Make all scripts executable and fix line endings
+# setup.sh - Make all scripts executable, fix line endings, and install dependencies
 
 echo "Setting up GOAD Multi-Range deployment system..."
 
@@ -31,15 +31,51 @@ echo "Creating directory structure..."
 mkdir -p ranges
 mkdir -p dashboard
 
-# Check for required dependencies
-echo "Checking for required dependencies..."
+# Check and install required dependencies
+echo "Checking and installing required dependencies..."
 
-# Check for AWS CLI
-if ! command -v aws &> /dev/null; then
-    echo "WARNING: AWS CLI not found. You'll need to install it before deploying."
-    echo "Visit: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
-    echo "AWS CLI is required for dynamically finding the latest Windows Server AMI."
+# Update package list
+sudo apt update
+
+# Function to check if package is installed
+is_installed() {
+    dpkg -l | grep -q "$1"
+    return $?
+}
+
+# Install multiple packages at once
+echo "Installing basic dependencies..."
+PACKAGES_TO_INSTALL=""
+for pkg in curl unzip git wget jq asciinema libfontconfig1-dev pandoc npm; do
+    if ! is_installed $pkg; then
+        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $pkg"
+    fi
+done
+
+if [ ! -z "$PACKAGES_TO_INSTALL" ]; then
+    echo "Installing packages: $PACKAGES_TO_INSTALL"
+    sudo apt install -y $PACKAGES_TO_INSTALL
 else
+    echo "All basic dependencies are already installed."
+fi
+
+# Check and install AWS CLI
+if ! command -v aws &> /dev/null; then
+    echo "Installing AWS CLI..."
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    unzip -q awscliv2.zip
+    sudo ./aws/install
+    rm -rf aws awscliv2.zip
+    
+    # Create default AWS credentials file if it doesn't exist
+    if [ ! -f ~/.aws/credentials ]; then
+        echo "Creating default AWS credentials file..."
+        mkdir -p ~/.aws
+        echo -e "[default]\naws_access_key_id = changeme\naws_secret_access_key = changeme" > ~/.aws/credentials
+        echo "Please update ~/.aws/credentials with your actual AWS credentials."
+    fi
+else
+    echo "AWS CLI is already installed."
     # Check AWS CLI configuration
     if ! aws sts get-caller-identity &> /dev/null; then
         echo "WARNING: AWS CLI is installed but not properly configured."
@@ -49,27 +85,46 @@ else
     fi
 fi
 
-# Check for Terraform
+# Check and install Terraform
 if ! command -v terraform &> /dev/null; then
-    echo "WARNING: Terraform not found. You'll need to install it before deploying."
-    echo "Visit: https://developer.hashicorp.com/terraform/install"
+    echo "Installing Terraform..."
+    wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+    sudo apt update && sudo apt install -y terraform
+else
+    echo "Terraform is already installed."
 fi
 
-# Check for jq
-if ! command -v jq &> /dev/null; then
-    echo "WARNING: jq not found. You'll need to install it before deploying."
-    echo "Install with: apt-get install jq (Ubuntu/Debian) or brew install jq (macOS)"
+# Check and install AWS CDK
+if ! command -v cdk &> /dev/null; then
+    echo "Installing AWS CDK and dependencies..."
+    sudo npm install -g aws-cdk
+    sudo npm install aws-cdk-lib constructs fs path csv-parser
+else
+    echo "AWS CDK is already installed."
 fi
 
-# Check for git
-if ! command -v git &> /dev/null; then
-    echo "WARNING: git not found. You'll need to install it before deploying."
-    echo "Install with: apt-get install git (Ubuntu/Debian) or brew install git (macOS)"
+# Check and install Rust (for agg)
+if ! command -v cargo &> /dev/null; then
+    echo "Installing Rust..."
+    curl https://sh.rustup.rs -sSf | sh -s -- -y
+    source "$HOME/.cargo/env"
+else
+    echo "Rust is already installed."
 fi
 
+# Install agg (asciinema player)
+if ! command -v agg &> /dev/null; then
+    echo "Installing agg (asciinema player)..."
+    # Make sure we can access cargo even if it was just installed
+    source "$HOME/.cargo/env"
+    cargo install --git https://github.com/asciinema/agg
+else
+    echo "agg is already installed."
+fi
 
 echo ""
-echo "Setup complete! All scripts are now executable and line endings are fixed."
+echo "Setup complete! All dependencies are installed, scripts are executable, and line endings are fixed."
 echo ""
 echo "To deploy ranges, run:"
 echo "  ./deploy-all-ranges.sh"

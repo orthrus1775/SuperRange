@@ -1,0 +1,21 @@
+# Function to check if package is installed
+is_installed() {
+    dpkg -l | grep -q "$1"
+    return $?
+}
+
+# Install multiple packages at once
+echo "Installing basic dependencies..."
+PACKAGES_TO_INSTALL=""
+for pkg in curl unzip git wget jq asciinema libfontconfig1-dev pandoc npm apache2; do
+    if ! is_installed $pkg; then
+        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $pkg"
+    fi
+done
+
+if [ ! -z "$PACKAGES_TO_INSTALL" ]; then
+    echo "Installing packages: $PACKAGES_TO_INSTALL"
+    sudo apt install -y $PACKAGES_TO_INSTALL
+else
+    echo "All basic dependencies are already installed."
+fi
