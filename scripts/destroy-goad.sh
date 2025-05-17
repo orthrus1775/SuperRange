@@ -197,4 +197,5 @@ if [ -f "$CONFIG_FILE" ]; then
 fi
 
 echo "GOAD-Light environment destroyed successfully for range: $RANGE_ID"
+
 return 0

@@ -357,4 +357,5 @@ EOF
 echo "Documentation generated for range: $RANGE_ID"
 echo "- README: ${DOCS_DIR}/README.md"
 echo "- HTML: ${DOCS_DIR}/index.html"
+
 echo "- Cheat Sheet: ${DOCS_DIR}/cheatsheet.md"

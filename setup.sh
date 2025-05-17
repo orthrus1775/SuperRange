@@ -67,6 +67,7 @@ if ! command -v git &> /dev/null; then
     echo "Install with: apt-get install git (Ubuntu/Debian) or brew install git (macOS)"
 fi
 
+
 echo ""
 echo "Setup complete! All scripts are now executable and line endings are fixed."
 echo ""

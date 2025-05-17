@@ -95,6 +95,7 @@ done
 # Update final status
 jq ".destruction.end_time = \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\", .destruction.status = \"completed\"" destruction-status.json > temp.json && mv temp.json destruction-status.json
 
+
 echo ""
 echo "=================================================="
 echo "All ranges destroyed successfully!"

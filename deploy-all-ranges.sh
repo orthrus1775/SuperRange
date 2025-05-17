@@ -113,6 +113,7 @@ echo ""
 echo "Generating dashboard..."
 $SCRIPT_DIR/generate-dashboard.sh "${RANGES[@]}" "$BASE_DIR"
 
+
 echo ""
 echo "=================================================="
 echo "All ranges deployed successfully!"

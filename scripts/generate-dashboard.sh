@@ -383,6 +383,7 @@ done
 # Copy dashboard to base directory
 cp -r "$DASHBOARD_DIR" "$BASE_DIR/"
 
+
 echo "Dashboard generated at:"
 echo "- ${DASHBOARD_DIR}/index.html"
 echo "- ${BASE_DIR}/dashboard/index.html"

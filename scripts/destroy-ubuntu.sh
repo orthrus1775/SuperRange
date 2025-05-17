@@ -54,5 +54,6 @@ EOF
 else
     echo "ERROR: Failed to destroy Ubuntu servers for range: $RANGE_ID"
     echo "Check logs at: $LOGFILE"
+    
     return 1
 fi

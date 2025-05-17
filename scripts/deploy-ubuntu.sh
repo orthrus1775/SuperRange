@@ -843,5 +843,6 @@ EOF
     return 0
 else
     echo "ERROR: Ubuntu servers deployment failed. Check logs at: $LOGFILE"
+    
     return 1
 fi

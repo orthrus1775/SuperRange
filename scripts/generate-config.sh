@@ -14,6 +14,7 @@ AWS_AZ=$4
 
 # Generate a unique range number (1-254) from the range ID
 RANGE_NUM=$(echo $RANGE_ID | md5sum | tr -d -c 0-9 | head -c 3)
+
 RANGE_NUM=$((RANGE_NUM % 254 + 1))
 
 # Generate unique CIDR blocks for the range
