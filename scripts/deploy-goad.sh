@@ -83,12 +83,18 @@ fi
 
 echo -e "${GREEN}Found Windows Server 2019 AMI: ${WIN_AMI}${NC}"
 
-# Update AMI IDs in aws.tf
-sed -i "s|ami = \".*\" # dc-2019|ami = \"${WIN_AMI}\" # dc-2019|g" aws/aws.tf
-sed -i "s|ami = \".*\" # srv-2019|ami = \"${WIN_AMI}\" # srv-2019|g" aws/aws.tf
-sed -i "s|ami = \".*\" # win10|ami = \"${WIN_AMI}\" # win10|g" aws/aws.tf
+WINDOWS_TF_PATH=$(pwd)/ad/GOAD-Light/providers/aws/windows.tf
 
-echo -e "${GREEN}Updated AMI IDs in aws.tf${NC}"
+if [ ! -f "$WINDOWS_TF_PATH" ]; then
+    echo -e "${RED}Error: Windows terraform file not found at: $WINDOWS_TF_PATH${NC}"
+    exit 1
+fi
+
+echo -e "${YELLOW}Updating Windows AMI IDs in windows.tf...${NC}"
+sed -i "s|ami-[a-z0-9]*|${WIN_AMI}|g"  $WINDOWS_TF_PATH
+
+echo -e "${GREEN}Updated AMI IDs in windows.tf${NC}"
+
 
 # Deploy GOAD Light with a Windows 10 workstation and attackboxes extension
 echo -e "${YELLOW}Deploying GOAD Light with Windows 10 workstation and attackboxes...${NC}"

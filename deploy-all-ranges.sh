@@ -11,7 +11,7 @@ set -e
 trap 'echo -e "${RED}Error: Command failed at line $LINENO${NC}"; exit 1' ERR
 
 # Configuration
-RANGES=(1 2 3) # Default: Deploy 3 ranges
+RANGES=(1) # Default: Deploy 3 ranges
 DEPLOYMENT_STATUS_FILE="deployment-status.json"
 GOAD_REPO="https://github.com/Orange-Cyberdefense/GOAD.git"
 GOAD_BRANCH="main"
@@ -93,7 +93,7 @@ deploy_range() {
     
     # Generate range configuration
     ./scripts/generate-config.sh "$range_id"
-    
+    read -p "Press Enter to continue..."
     # Create GOAD directory if it doesn't exist
     if [ ! -d "$range_dir/goad" ]; then
         echo -e "${YELLOW}Cloning GOAD repository for Range ${range_id}...${NC}"
