@@ -1,6 +1,8 @@
 #!/bin/bash
 # generate-dashboard.sh - Generate a dashboard for all ranges
 
+# NEEDS TO BE FIXED IN THE FUTURE
+
 set -e # Exit on any error
 
 # Check if arguments are provided

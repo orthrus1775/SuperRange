@@ -1,8 +1,11 @@
 #!/bin/bash
 # destroy-ubuntu.sh - Destroy Ubuntu servers for a specific range
 
-set -e # Exit on any error
+# PENDING REMOVAL
 
+
+set -e # Exit on any error
+exit 1
 # Check arguments
 if [ $# -lt 2 ]; then
     echo "Usage: $0 <range-id> <base-dir>"

@@ -1,0 +1,20 @@
+[libdefaults]
+	default_realm = {{ domain_name | upper }}
+	dns_lookup_realm = false
+	dns_lookup_kdc = false
+
+[realms]
+	{{ domain_name | upper }} = {
+		kdc = kingslanding.{{ domain_name }}
+		admin_server = kingslanding.{{ domain_name }}
+	}
+	{{ child_domain_name | upper }} = {
+		kdc = winterfell.{{ child_domain_name }}
+		admin_server = winterfell.{{ child_domain_name }}
+	}
+
+[domain_realm]
+	.{{ domain_name }} = {{ domain_name | upper }}
+	{{ domain_name }} = {{ domain_name | upper }}
+	.{{ child_domain_name }} = {{ child_domain_name | upper }}
+	{{ child_domain_name }} = {{ child_domain_name | upper }}

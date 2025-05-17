@@ -1,0 +1,7 @@
+---
+# Attack Boxes Extension Installation Playbook
+- name: Configure attack boxes
+  hosts: attackboxes
+  become: yes
+  roles:
+    - { role: 'attackbox-setup', tags: 'attackbox-setup' }

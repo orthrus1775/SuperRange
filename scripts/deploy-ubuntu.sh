@@ -3,7 +3,8 @@
 # deploy-ubuntu.sh - Deploy Ubuntu servers for a specific range
 
 set -e # Exit on any error
-
+# PENDING REMOVAL
+exit 1
 # Check arguments
 if [ $# -lt 2 ]; then
     echo "Usage: $0 <range-id> <base-dir>"

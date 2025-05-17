@@ -1,0 +1,191 @@
+---
+# Main tasks for setting up attack boxes
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install basic tools
+  apt:
+    name:
+      # Basic networking tools
+      - net-tools
+      - tcpdump
+      - nmap
+      - curl
+      - wget
+      # Useful utilities
+      - git
+      - vim
+      - unzip
+      - python3
+      - python3-pip
+      - openssh-server
+      - dnsutils
+      - iputils-ping
+      - traceroute
+      - tmux
+      - screen
+      - ubuntu-desktop
+      - xrdp
+    state: present
+
+- name: Install additional security tools
+  apt:
+    name: "{{ attackbox_additional_tools }}"
+    state: present
+  failed_when: false
+
+- name: Install Python tools for pentesting
+  pip:
+    name: "{{ attackbox_additional_python_tools }}"
+    state: present
+  failed_when: false
+
+# - name: Configure hosts file
+#   template:
+#     src: hosts.j2
+#     dest: /etc/hosts
+#     owner: root
+#     group: root
+#     mode: '0644'
+
+# - name: Configure krb5.conf
+#   template:
+#     src: krb5.conf.j2
+#     dest: /etc/krb5.conf
+#     owner: root
+#     group: root
+#     mode: '0644'
+#   when: setup_kerberos | default(true)
+
+# - name: Configure network for GOAD connection
+#   template:
+#     src: 99-goad-connection.yaml.j2
+#     dest: /etc/netplan/99-goad-connection.yaml
+#     owner: root
+#     group: root
+#     mode: '0644'
+#   when: setup_goad_network | default(true)    
+
+# - name: Apply netplan configuration
+#   command: netplan apply
+#   when: setup_goad_network | default(true)  
+
+- name: Enable and start SSH
+  service:
+    name: ssh
+    state: started
+    enabled: yes
+
+- name: Enable and start XRDP service
+  systemd:
+    name: xrdp
+    enabled: yes
+    state: started
+
+- name: Create PolicyKit file for XRDP
+  copy:
+    dest: /etc/polkit-1/localauthority/50-local.d/45-allow-colord.pkla
+    content: |
+      [Allow Colord all Users]
+      Identity=unix-user:*
+      Action=org.freedesktop.color-manager.create-device;org.freedesktop.color-manager.create-profile;org.freedesktop.color-manager.delete-device;org.freedesktop.color-manager.delete-profile;org.freedesktop.color-manager.modify-device;org.freedesktop.color-manager.modify-profile
+      ResultAny=no
+      ResultInactive=no
+      ResultActive=yes
+    mode: '0644'
+
+- name: Fix XRDP black screen after login
+  copy:
+    dest: /etc/xrdp/startwm.sh
+    content: |
+      #!/bin/sh
+      # xrdp X session starter script
+      unset DBUS_SESSION_BUS_ADDRESS
+      unset XDG_RUNTIME_DIR
+      . /etc/X11/Xsession
+    mode: '0755'
+
+- name: Configure firewall (UFW)
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 22
+    - 80
+    - 443
+    - 3389 # RDP port
+    - 4444
+    - 8080
+    - 9001
+    - 9002
+    - 9003
+    - 9004
+  failed_when: fals
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: allow
+  failed_when: false
+
+- name: Create a test file to verify deployment
+  file:
+    path: /root/attackbox_deployed.txt
+    state: touch
+    mode: '0644'
+    owner: root
+    group: root
+  
+- name: Create attack tools directory
+  file:
+    path: /opt/attack-tools
+    state: directory
+    mode: '0755'
+
+- name: Clone Git repositories
+  git:
+    repo: "{{ item.url }}"
+    dest: "/opt/attack-tools/{{ item.name }}"
+  loop: "{{ attackbox_git_repos }}"
+  failed_when: false
+
+- name: Create Desktop directory for ubuntu user
+  file:
+    path: /home/ubuntu/Desktop
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+  when: setup_desktop_shortcuts | default(true)
+
+- name: Create desktop shortcuts
+  template:
+    src: "{{ item }}.desktop.j2"
+    dest: "/home/ubuntu/Desktop/{{ item }}.desktop"
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+  with_items:
+    - terminal
+    - firefox
+  when: setup_desktop_shortcuts | default(true)
+  failed_when: false  
+
+- name: Create Documents directory for ubuntu user
+  file:
+    path: /home/ubuntu/Documents
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+  when: setup_desktop_shortcuts | default(true)
+
+- name: Enable IP forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: yes

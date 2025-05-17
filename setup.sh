@@ -94,6 +94,7 @@ if ! command -v terraform &> /dev/null; then
 else
     echo "Terraform is already installed."
 fi
+ 
 
 # Check and install AWS CDK
 if ! command -v cdk &> /dev/null; then
@@ -110,7 +111,7 @@ if ! command -v cargo &> /dev/null; then
     curl https://sh.rustup.rs -sSf | sh -s -- -y
     source "$HOME/.cargo/env"
 else
-    echo "Rust is already installed."
+    echo "Rust is already installed. "
 fi
 
 # Install agg (asciinema player)
