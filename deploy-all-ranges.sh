@@ -4,7 +4,7 @@
 set -e # Exit on any error
 
 # Configuration
-RANGES=("range1" "range2" "range3" "range4" "range5" "range6")
+RANGES=("range1" "range2")
 BASE_DIR="./ranges"
 SCRIPT_DIR="./scripts"
 
