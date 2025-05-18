@@ -123,11 +123,11 @@ deploy_range() {
 # Main function to deploy all ranges
 deploy_all_ranges() {
     check_prerequisites
-    get_aws_config
-    
+        
     echo -e "${GREEN}Deploying ${#RANGES[@]} ranges...${NC}"
     
     for range_id in "${RANGES[@]}"; do
+        get_aws_config
         deploy_range "$range_id"
     done
     
