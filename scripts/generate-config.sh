@@ -59,7 +59,7 @@ cat > "$CONFIG_FILE" <<EOF
     "ubuntu_version": "24.04",
     "username": "ubuntu",
     "password": "Password123!",
-    "ip_start": 80,
+    "ip_start": 50,
     "tools": [
       "nmap",
       "metasploit-framework",

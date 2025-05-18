@@ -84,14 +84,21 @@ fi
 echo -e "${GREEN}Found Windows Server 2019 AMI: ${WIN_AMI}${NC}"
 
 WINDOWS_TF_PATH=$(pwd)/ad/GOAD-Light/providers/aws/windows.tf
+WS_TF_PATH=$(pwd)/extensions/ws01/providers/aws/windows.tf
 
 if [ ! -f "$WINDOWS_TF_PATH" ]; then
     echo -e "${RED}Error: Windows terraform file not found at: $WINDOWS_TF_PATH${NC}"
     exit 1
 fi
 
+if [ ! -f "$WS_TF_PATH" ]; then
+    echo -e "${RED}Error: Windows terraform file not found at: $WS_TF_PATH${NC}"
+    exit 1
+fi
+
 echo -e "${YELLOW}Updating Windows AMI IDs in windows.tf...${NC}"
 sed -i "s|ami-[a-z0-9]*|${WIN_AMI}|g"  $WINDOWS_TF_PATH
+sed -i "s|ami-[a-z0-9]*|${WIN_AMI}|g"  $WS_TF_PATH
 
 echo -e "${GREEN}Updated AMI IDs in windows.tf${NC}"
 
@@ -112,22 +119,63 @@ if [ -z "$UBUNTU_AMI" ]; then
 fi
 echo -e "${GREEN}Found Ubuntu 24.04 LTS AMI: ${UBUNTU_AMI}${NC}"
 
-LINUX_TF_PATH=$(pwd)/extensions/attackboxes/providers/aws/linux.tf
+NOBEL_LINUX_TF_PATH=$(pwd)/extensions/attackboxes/providers/aws/linux.tf
 
-if [ ! -f "$LINUX_TF_PATH" ]; then
-    echo -e "${RED}Error: Windows terraform file not found at: $WINDOWS_TF_PATH${NC}"
+if [ ! -f "$NOBEL_LINUX_TF_PATH" ]; then
+    echo -e "${RED}Error: Windows terraform file not found at: $NOBEL_LINUX_TF_PATH${NC}"
     exit 1
 fi
 
 echo -e "${YELLOW}Updating Windows AMI IDs in windows.tf...${NC}"
-sed -i "s|ami-[a-z0-9]*|${UBUNTU_AMI}|g"  $LINUX_TF_PATH
+sed -i "s|ami-[a-z0-9]*|${UBUNTU_AMI}|g"  $NOBEL_LINUX_TF_PATH
+
+
+UBUNTU_AMI=$(aws ec2 describe-images \
+    --region "$AWS_REGION" \
+    --owners 099720109477 \
+    --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" \
+             "Name=state,Values=available" \
+    --query "sort_by(Images, &CreationDate)[-1].ImageId" \
+    --output text)
+
+if [ -z "$UBUNTU_AMI" ]; then
+    echo -e "${RED}Error: Could not find Ubuntu 22.04 LTS AMI for region ${AWS_REGION}.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}Found Ubuntu 22.04 LTS AMI: ${UBUNTU_AMI}${NC}"
+
+JAMMY_LINUX_TF_PATH=$(pwd)/template/provider/aws/jumpbox.tf
+
+if [ ! -f "$JAMMY_LINUX_TF_PATH" ]; then
+    echo -e "${RED}Error: Windows terraform file not found at: $JAMMY_LINUX_TF_PATH${NC}"
+    exit 1
+fi
+
+echo -e "${YELLOW}Updating Windows AMI IDs in windows.tf...${NC}"
+sed -i "s|ami-[a-z0-9]*|${UBUNTU_AMI}|g"  $JAMMY_LINUX_TF_PATH
 
 echo -e "${GREEN}Updated AMI IDs in linux.tf${NC}"
 
+echo -e "${YELLOW}Fixing GOAD Templates...${NC}"  
+TEMPLATE_DIR=$(pwd)/template/provider/aws
+TAG=Range-${RANGE_ID}
+find ${TEMPLATE_DIR} -type f -exec grep -l "{{lab_name}}" {} \; | while read file; do
+    # Replace "lab_name" with "range_id" in each file
+
+    sed -i "s/{{lab_name}}/${TAG}/g" "$file"
+    echo "Updated: $file"
+done  
+
+if [ ! -f "globalsettings.ini" ]; then
+    echo -e "${RED}Error: Could not find glovalsettings.ini${NC}"
+    exit 1
+fi
+sed -i 's/keyboard_layouts=\["0000040C", "00000409"\]/keyboard_layouts=\["00000409"\]/g' globalsettings.ini
+echo "rangeid=range$RANGE_ID" >> globalsettings.ini
 
 # Deploy GOAD Light with a Windows 10 workstation and attackboxes extension
 echo -e "${YELLOW}Deploying GOAD Light with Windows 10 workstation and attackboxes...${NC}"
-./goad.sh -t install -l GOAD-Light -p aws -m local -e ws01 attackboxes
+./goad.sh -t install -l GOAD-Light -p aws -m local -e ws01 -e attackboxes
 
 # Wait for deployment to complete
 echo -e "${GREEN}GOAD deployment started. Waiting for completion...${NC}"

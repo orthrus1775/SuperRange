@@ -4,9 +4,10 @@
   linux_sku          = "24_04-lts-gen2"
   linux_version      = "latest"
   ami                = "ami-0158cbc3c8e9ef377"
-  private_ip_address = "{{ip_range}}.80"
+  private_ip_address = "{{ip_range}}.50"
   password           = "suppaP@ssw0rd$"
-  size               = "t2.2xlarge"
+  instance_type      = "t2.2xlarge"
+  size               = "t2.2xlarge"  # Include both instance_type and size
   disk_size          = 60  # Disk size in GB
 }
 "attackbox-2" = {
@@ -14,9 +15,10 @@
   linux_sku          = "24_04-lts-gen2"
   linux_version      = "latest"
   ami                = "ami-0158cbc3c8e9ef377"
-  private_ip_address = "{{ip_range}}.81"
+  private_ip_address = "{{ip_range}}.51"
   password           = "suppaP@ssw0rd$"
-  size               = "t2.2xlarge"
+  instance_type      = "t2.2xlarge"
+  size               = "t2.2xlarge"  # Include both instance_type and size
   disk_size          = 60  # Disk size in GB
 }
 "attackbox-3" = {
@@ -24,8 +26,9 @@
   linux_sku          = "24_04-lts-gen2"
   linux_version      = "latest"
   ami                = "ami-0158cbc3c8e9ef377"
-  private_ip_address = "{{ip_range}}.82"
+  private_ip_address = "{{ip_range}}.52"
   password           = "suppaP@ssw0rd$"
-  size               = "t2.2xlarge"
+  instance_type      = "t2.2xlarge"
+  size               = "t2.2xlarge"  # Include both instance_type and size
   disk_size          = 60  # Disk size in GB
 }
