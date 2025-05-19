@@ -166,12 +166,12 @@ find ${TEMPLATE_DIR} -type f -exec grep -l "{{lab_name}}" {} \; | while read fil
     echo "Updated: $file"
 done
 
-LIN_TEMPLATE=${TEMPLATE_DIR}/linux.tf
-if [ ! -f "$LIN_TEMPLATE" ]; then
-    echo -e "${RED}Error: Linux terraform file not found at: $LIN_TEMPLATE${NC}"
-    exit 1
-fi
-sed -i 's/aws_subnet\.goad_private_network\.id/aws_subnet.goad_public_network.id/g' $LIN_TEMPLATE
+# LIN_TEMPLATE=${TEMPLATE_DIR}/linux.tf
+# if [ ! -f "$LIN_TEMPLATE" ]; then
+#     echo -e "${RED}Error: Linux terraform file not found at: $LIN_TEMPLATE${NC}"
+#     exit 1
+# fi
+# sed -i 's/aws_subnet\.goad_private_network\.id/aws_subnet.goad_public_network.id/g' $LIN_TEMPLATE
 
 if [ ! -f "globalsettings.ini" ]; then
     echo -e "${RED}Error: Could not find glovalsettings.ini${NC}"
@@ -182,7 +182,8 @@ echo "rangeid=range$RANGE_ID" >> globalsettings.ini
 
 # Deploy GOAD Light with a Windows 10 workstation and attackboxes extension
 echo -e "${YELLOW}Deploying GOAD Light with Windows 10 workstation and attackboxes...${NC}"
-./goad.sh -t install -l GOAD-Light -p aws -m local -e ws01 -e attackboxes
+# ./goad.sh -t install -l GOAD-Light -p aws -m local -e ws01 -e attackboxes
+./goad.sh -t install -l GOAD-Light -p aws -m local -e ws01
 
 # Wait for deployment to complete
 echo -e "${GREEN}GOAD deployment started. Waiting for completion...${NC}"

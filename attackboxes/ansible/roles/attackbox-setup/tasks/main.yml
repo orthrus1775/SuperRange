@@ -4,6 +4,13 @@
   apt:
     update_cache: yes
     cache_valid_time: 3600
+  ignore_errors: yes
+  register: apt_update_result
+
+- name: Display warning if apt update failed
+  debug:
+    msg: "WARNING: apt update failed but continuing with the playbook"
+  when: apt_update_result.failed | default(false)
 
 - name: Install basic tools
   apt:
@@ -11,7 +18,7 @@
       # Basic networking tools
       - net-tools
       - tcpdump
-      - nmap
+      # - nmap
       - curl
       - wget
       # Useful utilities
@@ -28,19 +35,26 @@
       - screen
       - ubuntu-desktop
       - xrdp
+      - mingw-w64 
+      - build-essential
+      - gpg
+      - binutils-mingw-w64
+      - g++-mingw-w6 
     state: present
+  ignore_errors: yes
 
-- name: Install additional security tools
-  apt:
-    name: "{{ attackbox_additional_tools }}"
-    state: present
-  failed_when: false
 
-- name: Install Python tools for pentesting
-  pip:
-    name: "{{ attackbox_additional_python_tools }}"
-    state: present
-  failed_when: false
+# - name: Install additional security tools
+#   apt:
+#     name: "{{ attackbox_additional_tools }}"
+#     state: present
+#   failed_when: false
+
+# - name: Install Python tools for pentesting
+#   pip:
+#     name: "{{ attackbox_additional_python_tools }}"
+#     state: present
+#   failed_when: false
 
 # - name: Configure hosts file
 #   template:
@@ -84,17 +98,17 @@
     enabled: yes
     state: started
 
-- name: Create PolicyKit file for XRDP
-  copy:
-    dest: /etc/polkit-1/localauthority/50-local.d/45-allow-colord.pkla
-    content: |
-      [Allow Colord all Users]
-      Identity=unix-user:*
-      Action=org.freedesktop.color-manager.create-device;org.freedesktop.color-manager.create-profile;org.freedesktop.color-manager.delete-device;org.freedesktop.color-manager.delete-profile;org.freedesktop.color-manager.modify-device;org.freedesktop.color-manager.modify-profile
-      ResultAny=no
-      ResultInactive=no
-      ResultActive=yes
-    mode: '0644'
+# - name: Create PolicyKit file for XRDP
+#   copy:
+#     dest: /etc/polkit-1/localauthority/50-local.d/45-allow-colord.pkla
+#     content: |
+#       [Allow Colord all Users]
+#       Identity=unix-user:*
+#       Action=org.freedesktop.color-manager.create-device;org.freedesktop.color-manager.create-profile;org.freedesktop.color-manager.delete-device;org.freedesktop.color-manager.delete-profile;org.freedesktop.color-manager.modify-device;org.freedesktop.color-manager.modify-profile
+#       ResultAny=no
+#       ResultInactive=no
+#       ResultActive=yes
+#     mode: '0644'
 
 - name: Fix XRDP black screen after login
   copy:
@@ -132,13 +146,13 @@
     policy: allow
   failed_when: false
 
-- name: Create a test file to verify deployment
-  file:
-    path: /root/attackbox_deployed.txt
-    state: touch
-    mode: '0644'
-    owner: root
-    group: root
+# - name: Create a test file to verify deployment
+#   file:
+#     path: /root/attackbox_deployed.txt
+#     state: touch
+#     mode: '0644'
+#     owner: root
+#     group: root
   
 - name: Create attack tools directory
   file:
@@ -185,8 +199,5 @@
   when: setup_desktop_shortcuts | default(true)
 
 - name: Enable IP forwarding
-  sysctl:
-    name: net.ipv4.ip_forward
-    value: '1'
-    state: present
-    reload: yes
+  command: sysctl -w net.ipv4.ip_forward=1
+  become: yes
