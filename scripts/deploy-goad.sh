@@ -126,7 +126,7 @@ if [ ! -f "$NOBEL_LINUX_TF_PATH" ]; then
     exit 1
 fi
 
-echo -e "${YELLOW}Updating Windows AMI IDs in windows.tf...${NC}"
+echo -e "${YELLOW}Updating Windows AMI IDs in attackbox.tf...${NC}"
 sed -i "s|ami-[a-z0-9]*|${UBUNTU_AMI}|g"  $NOBEL_LINUX_TF_PATH
 
 
@@ -164,7 +164,14 @@ find ${TEMPLATE_DIR} -type f -exec grep -l "{{lab_name}}" {} \; | while read fil
 
     sed -i "s/{{lab_name}}/${TAG}/g" "$file"
     echo "Updated: $file"
-done  
+done
+
+LIN_TEMPLATE=${TEMPLATE_DIR}/linux.tf
+if [ ! -f "$LIN_TEMPLATE" ]; then
+    echo -e "${RED}Error: Linux terraform file not found at: $LIN_TEMPLATE${NC}"
+    exit 1
+fi
+sed -i 's/aws_subnet\.goad_private_network\.id/aws_subnet.goad_public_network.id/g' $LIN_TEMPLATE
 
 if [ ! -f "globalsettings.ini" ]; then
     echo -e "${RED}Error: Could not find glovalsettings.ini${NC}"
