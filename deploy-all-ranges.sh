@@ -72,11 +72,13 @@ get_aws_config() {
     # Get AWS region
     read -p "Enter AWS region (default: us-east-1): " AWS_REGION
     AWS_REGION=${AWS_REGION:-us-east-1}
+    read -p "Enter AWS region (default: us-east-1): " AWS_REGION
+    AWS_ZONE=${AWS_REGION:-us-east-1a}
     
     # Export as environment variables
     export TF_VAR_aws_key_pair="$AWS_KEY_PAIR"
     export TF_VAR_aws_region="$AWS_REGION"
-    
+    export TF_VAR_aws_region="$AWS_REGION"
     echo -e "${GREEN}AWS configuration set.${NC}"
 }
 
