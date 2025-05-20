@@ -26,7 +26,10 @@ CONFIG_FILE="${RANGE_DIR}/range-config.json"
 # Get AWS region from environment variable or default to us-east-1
 AWS_REGION=${TF_VAR_aws_region:-us-east-1}
 AWS_KEY_PAIR=${TF_VAR_aws_key_pair:-"default"}
-AWS_ZONE=${TF_VAR_aws_region:-us-east-1}
+AWS_ZONE=${TF_VAR_aws_zone:-us-east-1a}
+
+echo $AWS_ZONE
+read -p "Prompt message: "
 
 # Create range directory if it doesn't exist
 mkdir -p "$RANGE_DIR"

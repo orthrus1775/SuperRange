@@ -54,16 +54,6 @@ AWS_KEY_PAIR=$(jq -r '.aws_key_pair' "$CONFIG_FILE")
 # ATTACKBOX_INSTANCE_TYPE=$(jq -r '.attackboxes.instance_type // "t2.2xlarge"' "$CONFIG_FILE")
 # ATTACKBOX_IP_START=$(jq -r '.attackboxes.ip_start // 80' "$CONFIG_FILE")
 
-
-echo $RANGE_ID
-echo $RANGE_DIR
-echo $CONFIG_FILE
-echo $GOAD_DIR
-echo $RANGE_NUMBER
-echo $AWS_REGION
-echo $AWS_ZONE
-echo $AWS_KEY_PAIR
-
 # Change to GOAD directory
 cd "$GOAD_DIR"
 
@@ -171,10 +161,7 @@ echo -e "${YELLOW}Fixing GOAD Templates...${NC}"
 TEMPLATE_DIR=$(pwd)/template/provider/aws
 TAG=Range-${RANGE_ID}
 find ${TEMPLATE_DIR} -type f -exec grep -l "{{lab_name}}" {} \; | while read file; do
-    # Replace "lab_name" with "range_id" in each file
-
     sed -i "s/{{lab_name}}/${TAG}/g" "$file"
-    echo "Updated: $file"
 done
 
 VARS_TF_PATH=${TEMPLATE_DIR}/variables.tf
@@ -182,8 +169,8 @@ if [ ! -f "$VARS_TF_PATH" ]; then
     echo -e "${RED}Error: variables terraform file not found at: $VARS_TF_PATH${NC}"
     exit 1
 fi
-sed -i 's/eu-west-3c/$AWS_ZONE/g' $VARS_TF_PATH
-sed -i 's/eu-west-3/$AWS_REGION/g' $VARS_TF_PATH
+sed -i "s/eu-west-3c/${AWS_ZONE}/g" $VARS_TF_PATH
+sed -i "s/eu-west-3/${AWS_REGION}/g" $VARS_TF_PATH
 
 # LIN_TEMPLATE=${TEMPLATE_DIR}/linux.tf
 # if [ ! -f "$LIN_TEMPLATE" ]; then
