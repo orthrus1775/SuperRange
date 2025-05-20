@@ -50,9 +50,19 @@ AWS_ZONE=$(jq -r '.aws_zone' "$CONFIG_FILE")
 AWS_KEY_PAIR=$(jq -r '.aws_key_pair' "$CONFIG_FILE")
 
 # Get attackbox configuration
-ATTACKBOX_COUNT=$(jq -r '.attackboxes.count // 3' "$CONFIG_FILE")
-ATTACKBOX_INSTANCE_TYPE=$(jq -r '.attackboxes.instance_type // "t2.2xlarge"' "$CONFIG_FILE")
-ATTACKBOX_IP_START=$(jq -r '.attackboxes.ip_start // 80' "$CONFIG_FILE")
+# ATTACKBOX_COUNT=$(jq -r '.attackboxes.count // 3' "$CONFIG_FILE")
+# ATTACKBOX_INSTANCE_TYPE=$(jq -r '.attackboxes.instance_type // "t2.2xlarge"' "$CONFIG_FILE")
+# ATTACKBOX_IP_START=$(jq -r '.attackboxes.ip_start // 80' "$CONFIG_FILE")
+
+
+echo $RANGE_ID
+echo $RANGE_DIR
+echo $CONFIG_FILE
+echo $GOAD_DIR
+echo $RANGE_NUMBER
+echo $AWS_REGION
+echo $AWS_ZONE
+echo $AWS_KEY_PAIR
 
 # Change to GOAD directory
 cd "$GOAD_DIR"
@@ -167,7 +177,13 @@ find ${TEMPLATE_DIR} -type f -exec grep -l "{{lab_name}}" {} \; | while read fil
     echo "Updated: $file"
 done
 
-VARS_TF_PATH=${TEMPLATE_DIR}/
+VARS_TF_PATH=${TEMPLATE_DIR}/variables.tf
+if [ ! -f "$VARS_TF_PATH" ]; then
+    echo -e "${RED}Error: variables terraform file not found at: $VARS_TF_PATH${NC}"
+    exit 1
+fi
+sed -i 's/eu-west-3c/$AWS_ZONE/g' $VARS_TF_PATH
+sed -i 's/eu-west-3/$AWS_REGION/g' $VARS_TF_PATH
 
 # LIN_TEMPLATE=${TEMPLATE_DIR}/linux.tf
 # if [ ! -f "$LIN_TEMPLATE" ]; then
@@ -181,7 +197,7 @@ if [ ! -f "globalsettings.ini" ]; then
     exit 1
 fi
 sed -i 's/keyboard_layouts=\["0000040C", "00000409"\]/keyboard_layouts=\["00000409"\]/g' globalsettings.ini
-echo "rangeid=range$RANGE_ID" >> globalsettings.ini
+# echo "rangeid=range$RANGE_ID" >> globalsettings.ini
 
 read -p "Validate setting"
 
@@ -198,51 +214,51 @@ if [ $? -eq 0 ]; then
     echo -e "${GREEN}GOAD deployed successfully for Range ${RANGE_ID}.${NC}"
     
     # Extract and save IPs to range configuration
-    echo -e "${YELLOW}Extracting IPs and updating range configuration...${NC}"
+    # echo -e "${YELLOW}Extracting IPs and updating range configuration...${NC}"
     
-    # Get IPs from terraform output
-    KINGSLANDING_IP=$(terraform output -json kingslanding_ip | tr -d '"')
-    WINTERFELL_IP=$(terraform output -json winterfell_ip | tr -d '"')
-    CASTELBLACK_IP=$(terraform output -json castelblack_ip | tr -d '"')
-    DESKTOP_IP=$(terraform output -json desktop_ip | tr -d '"')
+    # # Get IPs from terraform output
+    # KINGSLANDING_IP=$(terraform output -json kingslanding_ip | tr -d '"')
+    # WINTERFELL_IP=$(terraform output -json winterfell_ip | tr -d '"')
+    # CASTELBLACK_IP=$(terraform output -json castelblack_ip | tr -d '"')
+    # DESKTOP_IP=$(terraform output -json desktop_ip | tr -d '"')
     
-    KINGSLANDING_PUBLIC_IP=$(terraform output -json kingslanding_public_ip | tr -d '"')
-    WINTERFELL_PUBLIC_IP=$(terraform output -json winterfell_public_ip | tr -d '"')
-    CASTELBLACK_PUBLIC_IP=$(terraform output -json castelblack_public_ip | tr -d '"')
-    DESKTOP_PUBLIC_IP=$(terraform output -json desktop_public_ip | tr -d '"')
+    # KINGSLANDING_PUBLIC_IP=$(terraform output -json kingslanding_public_ip | tr -d '"')
+    # WINTERFELL_PUBLIC_IP=$(terraform output -json winterfell_public_ip | tr -d '"')
+    # CASTELBLACK_PUBLIC_IP=$(terraform output -json castelblack_public_ip | tr -d '"')
+    # DESKTOP_PUBLIC_IP=$(terraform output -json desktop_public_ip | tr -d '"')
     
-    # Get attackboxes IPs
-    ATTACKBOXES_IPS=$(terraform output -json attackboxes_ips 2>/dev/null || echo '["N/A"]')
-    ATTACKBOXES_PUBLIC_IPS=$(terraform output -json attackboxes_public_ips 2>/dev/null || echo '["N/A"]')
+    # # Get attackboxes IPs
+    # ATTACKBOXES_IPS=$(terraform output -json attackboxes_ips 2>/dev/null || echo '["N/A"]')
+    # ATTACKBOXES_PUBLIC_IPS=$(terraform output -json attackboxes_public_ips 2>/dev/null || echo '["N/A"]')
     
-    # Update range configuration with IPs
-    cd - > /dev/null  # Go back to previous directory
+    # # Update range configuration with IPs
+    # cd - > /dev/null  # Go back to previous directory
     
-    # Update with GOAD IPs
-    jq --arg k_ip "$KINGSLANDING_IP" \
-       --arg w_ip "$WINTERFELL_IP" \
-       --arg c_ip "$CASTELBLACK_IP" \
-       --arg d_ip "$DESKTOP_IP" \
-       --arg k_pub "$KINGSLANDING_PUBLIC_IP" \
-       --arg w_pub "$WINTERFELL_PUBLIC_IP" \
-       --arg c_pub "$CASTELBLACK_PUBLIC_IP" \
-       --arg d_pub "$DESKTOP_PUBLIC_IP" \
-       --argjson a_ips "$ATTACKBOXES_IPS" \
-       --argjson a_pubs "$ATTACKBOXES_PUBLIC_IPS" \
-       '.goad = {
-          "kingslanding_ip": $k_ip,
-          "winterfell_ip": $w_ip,
-          "castelblack_ip": $c_ip,
-          "desktop_ip": $d_ip,
-          "kingslanding_public_ip": $k_pub,
-          "winterfell_public_ip": $w_pub,
-          "castelblack_public_ip": $c_pub,
-          "desktop_public_ip": $d_pub
-        } | .attackboxes.deployed_ips = $a_ips | .attackboxes.deployed_public_ips = $a_pubs' \
-       "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && \
-    mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+    # # Update with GOAD IPs
+    # jq --arg k_ip "$KINGSLANDING_IP" \
+    #    --arg w_ip "$WINTERFELL_IP" \
+    #    --arg c_ip "$CASTELBLACK_IP" \
+    #    --arg d_ip "$DESKTOP_IP" \
+    #    --arg k_pub "$KINGSLANDING_PUBLIC_IP" \
+    #    --arg w_pub "$WINTERFELL_PUBLIC_IP" \
+    #    --arg c_pub "$CASTELBLACK_PUBLIC_IP" \
+    #    --arg d_pub "$DESKTOP_PUBLIC_IP" \
+    #    --argjson a_ips "$ATTACKBOXES_IPS" \
+    #    --argjson a_pubs "$ATTACKBOXES_PUBLIC_IPS" \
+    #    '.goad = {
+    #       "kingslanding_ip": $k_ip,
+    #       "winterfell_ip": $w_ip,
+    #       "castelblack_ip": $c_ip,
+    #       "desktop_ip": $d_ip,
+    #       "kingslanding_public_ip": $k_pub,
+    #       "winterfell_public_ip": $w_pub,
+    #       "castelblack_public_ip": $c_pub,
+    #       "desktop_public_ip": $d_pub
+    #     } | .attackboxes.deployed_ips = $a_ips | .attackboxes.deployed_public_ips = $a_pubs' \
+    #    "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && \
+    # mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
     
-    echo -e "${GREEN}Range configuration updated with IPs.${NC}"
+    # echo -e "${GREEN}Range configuration updated with IPs.${NC}"
 else
     echo -e "${RED}Error: GOAD deployment failed for Range ${RANGE_ID}.${NC}"
     exit 1
