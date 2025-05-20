@@ -186,7 +186,7 @@ fi
 sed -i 's/keyboard_layouts=\["0000040C", "00000409"\]/keyboard_layouts=\["00000409"\]/g' globalsettings.ini
 # echo "rangeid=range$RANGE_ID" >> globalsettings.ini
 
-read -p "Validate setting"
+# read -p "Validate setting"
 
 # Deploy GOAD Light with a Windows 10 workstation and attackboxes extension
 echo -e "${YELLOW}Deploying GOAD Light with Windows 10 workstation and attackboxes...${NC}"
