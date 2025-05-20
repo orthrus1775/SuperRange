@@ -46,6 +46,7 @@ echo -e "${GREEN}Deploying GOAD for Range ${RANGE_ID}...${NC}"
 # Get range configuration
 RANGE_NUMBER=$(jq -r '.range_number' "$CONFIG_FILE")
 AWS_REGION=$(jq -r '.aws_region' "$CONFIG_FILE")
+AWS_ZONE=$(jq -r '.aws_zone' "$CONFIG_FILE")
 AWS_KEY_PAIR=$(jq -r '.aws_key_pair' "$CONFIG_FILE")
 
 # Get attackbox configuration
@@ -166,6 +167,8 @@ find ${TEMPLATE_DIR} -type f -exec grep -l "{{lab_name}}" {} \; | while read fil
     echo "Updated: $file"
 done
 
+VARS_TF_PATH=${TEMPLATE_DIR}/
+
 # LIN_TEMPLATE=${TEMPLATE_DIR}/linux.tf
 # if [ ! -f "$LIN_TEMPLATE" ]; then
 #     echo -e "${RED}Error: Linux terraform file not found at: $LIN_TEMPLATE${NC}"
@@ -179,6 +182,8 @@ if [ ! -f "globalsettings.ini" ]; then
 fi
 sed -i 's/keyboard_layouts=\["0000040C", "00000409"\]/keyboard_layouts=\["00000409"\]/g' globalsettings.ini
 echo "rangeid=range$RANGE_ID" >> globalsettings.ini
+
+read -p "Validate setting"
 
 # Deploy GOAD Light with a Windows 10 workstation and attackboxes extension
 echo -e "${YELLOW}Deploying GOAD Light with Windows 10 workstation and attackboxes...${NC}"

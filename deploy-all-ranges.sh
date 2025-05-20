@@ -11,7 +11,7 @@ set -e
 trap 'echo -e "${RED}Error: Command failed at line $LINENO${NC}"; exit 1' ERR
 
 # Configuration
-RANGES=(1) # Default: Deploy 3 ranges
+RANGES=(1 2 3) # Default: Deploy 3 ranges
 DEPLOYMENT_STATUS_FILE="deployment-status.json"
 GOAD_REPO="https://github.com/Orange-Cyberdefense/GOAD.git"
 GOAD_BRANCH="main"
@@ -72,11 +72,13 @@ get_aws_config() {
     # Get AWS region
     read -p "Enter AWS region (default: us-east-1): " AWS_REGION
     AWS_REGION=${AWS_REGION:-us-east-1}
+    read -p "Enter AWS region (default: us-east-1): " AWS_REGION
+    AWS_ZONE=${AWS_REGION:-us-east-1a}
     
     # Export as environment variables
     export TF_VAR_aws_key_pair="$AWS_KEY_PAIR"
     export TF_VAR_aws_region="$AWS_REGION"
-    
+    export TF_VAR_aws_region="$AWS_REGION"
     echo -e "${GREEN}AWS configuration set.${NC}"
 }
 
@@ -123,11 +125,11 @@ deploy_range() {
 # Main function to deploy all ranges
 deploy_all_ranges() {
     check_prerequisites
-        
+    get_aws_config
+    
     echo -e "${GREEN}Deploying ${#RANGES[@]} ranges...${NC}"
     
     for range_id in "${RANGES[@]}"; do
-        get_aws_config
         deploy_range "$range_id"
     done
     
