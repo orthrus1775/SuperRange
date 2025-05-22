@@ -131,13 +131,13 @@ echo -e "${YELLOW}Updating Windows AMI IDs in attackbox.tf...${NC}"
 sed -i "s|ami-[a-z0-9]*|${UBUNTU_AMI}|g"  $NOBEL_LINUX_TF_PATH
 
 
-UBUNTU_AMI=$(aws ec2 describe-images \
-    --region "$AWS_REGION" \
-    --owners 099720109477 \
-    --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" \
-             "Name=state,Values=available" \
-    --query "sort_by(Images, &CreationDate)[-1].ImageId" \
-    --output text)
+# UBUNTU_AMI=$(aws ec2 describe-images \
+#     --region "$AWS_REGION" \
+#     --owners 099720109477 \
+#     --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" \
+#              "Name=state,Values=available" \
+#     --query "sort_by(Images, &CreationDate)[-1].ImageId" \
+#     --output text)
 
 if [ -z "$UBUNTU_AMI" ]; then
     echo -e "${RED}Error: Could not find Ubuntu 22.04 LTS AMI for region ${AWS_REGION}.${NC}"
@@ -154,6 +154,7 @@ fi
 
 echo -e "${YELLOW}Updating Windows AMI IDs in windows.tf...${NC}"
 sed -i "s|ami-[a-z0-9]*|${UBUNTU_AMI}|g"  $JAMMY_LINUX_TF_PATH
+sed -i 's/t2.medium/t2.2xlarge/g' $JAMMY_LINUX_TF_PATH
 
 echo -e "${GREEN}Updated AMI IDs in linux.tf${NC}"
 
@@ -180,12 +181,13 @@ if [ ! -f "$AWS_SCRIPT" ]; then
 fi
 sed -i 's/python3-pip/python3-pip sshpass/' $AWS_SCRIPT
 
-WS01_PATH=$(pwd)/extensions/ws01/ansible/ws01/install.yml
+WS01_PATH=$(pwd)/extensions/ws01/ansible/install.yml
 if [ ! -f "$WS01_PATH" ]; then
     echo -e "${RED}Error: WS01 install.yml not found at: $WS01_PATH${NC}"
     exit 1
 fi
-sed -i '/local_groups: "{{lab\.hosts\[dict_key\]\.local_groups  | default({}) }}"/,$s/^/# /' $WS01_PATH
+# sed -i '/local_groups: "{{lab\.hosts\[dict_key\]\.local_groups  | default({}) }}"/,$s/^/# /' $WS01_PATH
+sed -i '48,$s/^/# /' $WS01_PATH # Comment out everything on line 48 and after
 
 if [ ! -f "globalsettings.ini" ]; then
     echo -e "${RED}Error: Could not find glovalsettings.ini${NC}"

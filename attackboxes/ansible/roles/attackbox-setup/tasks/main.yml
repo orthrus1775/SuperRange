@@ -15,6 +15,7 @@
       # Basic networking tools
       - net-tools
       - tcpdump
+      - nano
       - curl
       - wget
       - git
@@ -146,7 +147,7 @@
     - 9003
     - 9004
     - 9005
-  failed_when: fals
+  failed_when: false
 
 - name: Enable UFW
   ufw:
@@ -162,32 +163,52 @@
 #     owner: root
 #     group: root
   
-- name: Create attack tools directory
-  file:
-    path: /opt/attack-tools
-    state: directory
-    mode: '0755'
+# - name: Create attack tools directory
+#   file:
+#     path: /opt/attack-tools
+#     state: directory
+#     mode: '0755'
 
-- name: Clone Git repositories
-  git:
-    repo: "{{ item.url }}"
-    dest: "/opt/attack-tools/{{ item.name }}"
-  loop: "{{ attackbox_git_repos }}"
-  failed_when: false
+# - name: Clone Git repositories
+#   git:
+#     repo: "{{ item.url }}"
+#     dest: "/opt/attack-tools/{{ item.name }}"
+#   loop: "{{ attackbox_git_repos }}"
+#   failed_when: false
 
-- name: Create Desktop directory for ubuntu user
+- name: Create user 'attacker' with password
+  user:
+    name: attacker
+    password: "{{ 'GoCyber2025!!' | password_hash('sha512') }}"
+    shell: /bin/bash
+    create_home: yes
+    groups: sudo
+    append: yes
+    state: present
+  become: yes
+
+- name: Create Documents folder for attacker user
   file:
-    path: /home/ubuntu/Desktop
+    path: /home/attacker/Documents
     state: directory
-    owner: ubuntu
-    group: ubuntu
+    owner: attacker
+    group: attacker
     mode: '0755'
-  when: setup_desktop_shortcuts | default(true)
+  become: yes
+
+- name: Create Desktop folder for attacker user
+  file:
+    path: /home/attacker/Desktop
+    state: directory
+    owner: attacker
+    group: attacker
+    mode: '0755'
+  become: yes
 
 - name: Create desktop shortcuts
   template:
     src: "{{ item }}.desktop.j2"
-    dest: "/home/ubuntu/Desktop/{{ item }}.desktop"
+    dest: "/home/attacker/Desktop/{{ item }}.desktop"
     owner: ubuntu
     group: ubuntu
     mode: '0755'
@@ -197,15 +218,50 @@
   when: setup_desktop_shortcuts | default(true)
   failed_when: false  
 
-- name: Create Documents directory for ubuntu user
-  file:
-    path: /home/ubuntu/Documents
-    state: directory
-    owner: ubuntu
-    group: ubuntu
-    mode: '0755'
-  when: setup_desktop_shortcuts | default(true)
+- name: Backup original sshd_config
+  copy:
+    src: /etc/ssh/sshd_config
+    dest: /etc/ssh/sshd_config.backup
+    remote_src: yes
+  become: yes
 
-- name: Enable IP forwarding
-  command: sysctl -w net.ipv4.ip_forward=1
+- name: Enable password authentication for all users
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication yes'
+    state: present
+  become: yes
+  register: ssh_config_password
+
+- name: Enable SSH agent forwarding
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?AllowAgentForwarding'
+    line: 'AllowAgentForwarding yes'
+    state: present
+  become: yes
+  register: ssh_config_agent
+
+- name: Enable X11 forwarding
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?X11Forwarding'
+    line: 'X11Forwarding yes'
+    state: present
+  become: yes
+  register: ssh_config_x11
+
+- name: Ensure UsePAM is enabled
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?UsePAM'
+    line: 'UsePAM yes'
+    state: present
+  become: yes
+
+- name: Restart SSH service if configuration changed
+  service:
+    name: sshd
+    state: restarted
   become: yes
