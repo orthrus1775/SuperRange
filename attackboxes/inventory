@@ -9,23 +9,19 @@ attackbox-1 ansible_host={{ip_range}}.50 dict_key=attackbox-1
 attackbox-2 ansible_host={{ip_range}}.51 dict_key=attackbox-2
 attackbox-3 ansible_host={{ip_range}}.52 dict_key=attackbox-3
 {% endif %}
-
 [extensions]
 attackbox-1
 attackbox-2
 attackbox-3
-
 ; Recipe associations
 [attackboxes]
 attackbox-1
 attackbox-2
 attackbox-3
-
 [attackboxes:vars]
 admin_user=goadmin
-workspace_dir="{{ lookup('env', 'HOME') }}/GOAD/workspace/{{ lookup('pipe', 'find ~/GOAD/workspace -type d -name \"*-goad-light-aws\" | head -1 | xargs basename') }}"
-ansible_ssh_private_key_file="{{ workspace_dir }}/ssh_keys/ubuntu-jumpbox.pem"
+workspace_dir="{% raw %}{{ lookup('env', 'HOME') }}{% endraw %}/GOAD/workspace/{% raw %}{{ lookup('pipe', 'find ~/GOAD/workspace -type d -name \"*-goad-light-aws\" | head -1 | xargs basename') }}{% endraw %}"
+ansible_ssh_private_key_file="{% raw %}{{ workspace_dir }}{% endraw %}/ssh_keys/ubuntu-jumpbox.pem"
 ansible_connection=ssh
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 ansible_become=yes
-ansible_python_interpreter=/usr/bin/python3

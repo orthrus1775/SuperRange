@@ -1,16 +1,13 @@
 ---
-# Main tasks for setting up attack boxes
-- name: Update apt cache
-  apt:
-    update_cache: yes
-    cache_valid_time: 3600
-  ignore_errors: yes
-  register: apt_update_result
+- name: "Updating apt repo/cache"
+  apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+  become: true
+  become_method: sudo
 
-- name: Display warning if apt update failed
-  debug:
-    msg: "WARNING: apt update failed but continuing with the playbook"
-  when: apt_update_result.failed | default(false)
+- name: "Upgrade all packages"
+  apt: upgrade=yes force_apt_get=yes
+  become: true
+  become_method: sudo
 
 - name: Install basic tools
   apt:
@@ -18,10 +15,8 @@
       # Basic networking tools
       - net-tools
       - tcpdump
-      # - nmap
       - curl
       - wget
-      # Useful utilities
       - git
       - vim
       - unzip
@@ -32,6 +27,7 @@
       - iputils-ping
       - traceroute
       - tmux
+      - ufw
       - screen
       - ubuntu-desktop
       - xrdp
@@ -39,9 +35,21 @@
       - build-essential
       - gpg
       - binutils-mingw-w64
-      - g++-mingw-w6 
-    state: present
+      - g++-mingw-w64 
+      - cmake
+      - golang-go
+      - jq
+      - pipx
+      - smbclient
+      - smbmap
+      - rlwrap
+      - openssl
+      - osslsigncode
+      - autossh
+      - sshpass
+    state: present 
   ignore_errors: yes
+
 
 
 # - name: Install additional security tools

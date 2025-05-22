@@ -172,12 +172,20 @@ fi
 sed -i "s/eu-west-3c/${AWS_ZONE}/g" $VARS_TF_PATH
 sed -i "s/eu-west-3/${AWS_REGION}/g" $VARS_TF_PATH
 
-# LIN_TEMPLATE=${TEMPLATE_DIR}/linux.tf
-# if [ ! -f "$LIN_TEMPLATE" ]; then
-#     echo -e "${RED}Error: Linux terraform file not found at: $LIN_TEMPLATE${NC}"
-#     exit 1
-# fi
-# sed -i 's/aws_subnet\.goad_private_network\.id/aws_subnet.goad_public_network.id/g' $LIN_TEMPLATE
+SCRIPTS_PATH=$(pwd)/scripts/
+AWS_SCRIPT=${SCRIPTS_PATH}/setup_aws.sh
+if [ ! -f "$AWS_SCRIPT" ]; then
+    echo -e "${RED}Error: AWS setup script not found at: $AWS_SCRIPT${NC}"
+    exit 1
+fi
+sed -i 's/python3-pip/python3-pip sshpass/' $AWS_SCRIPT
+
+WS01_PATH=$(pwd)/extensions/ws01/ansible/ws01/install.yml
+if [ ! -f "$WS01_PATH" ]; then
+    echo -e "${RED}Error: WS01 install.yml not found at: $WS01_PATH${NC}"
+    exit 1
+fi
+sed -i '/local_groups: "{{lab\.hosts\[dict_key\]\.local_groups  | default({}) }}"/,$s/^/# /' $WS01_PATH
 
 if [ ! -f "globalsettings.ini" ]; then
     echo -e "${RED}Error: Could not find glovalsettings.ini${NC}"
@@ -186,12 +194,13 @@ fi
 sed -i 's/keyboard_layouts=\["0000040C", "00000409"\]/keyboard_layouts=\["00000409"\]/g' globalsettings.ini
 # echo "rangeid=range$RANGE_ID" >> globalsettings.ini
 
-# read -p "Validate setting"
+read -p "Validate setting"
 
 # Deploy GOAD Light with a Windows 10 workstation and attackboxes extension
 echo -e "${YELLOW}Deploying GOAD Light with Windows 10 workstation and attackboxes...${NC}"
-# ./goad.sh -t install -l GOAD-Light -p aws -m local -e ws01 -e attackboxes
-./goad.sh -t install -l GOAD-Light -p aws -m local -e ws01
+echo "Modify goad.py..."
+./goad.sh -t install -l GOAD-Light -p aws -m local -e ws01 -e attackboxes
+# ./goad.sh -t install -l GOAD-Light -p aws -m local -e ws01
 
 # Wait for deployment to complete
 echo -e "${GREEN}GOAD deployment started. Waiting for completion...${NC}"
