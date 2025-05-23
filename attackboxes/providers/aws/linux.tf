@@ -8,7 +8,7 @@
   password           = "suppaP@ssw0rd$"
   instance_type      = "t2.2xlarge"
   size               = "t2.2xlarge"  # Include both instance_type and size
-  volume_size          = 60  # Disk size in GB
+  volume_size        = 60  # Disk size in GB
 }
 "attackbox-2" = {
   name               = "attackbox-2"
@@ -19,7 +19,7 @@
   password           = "suppaP@ssw0rd$"
   instance_type      = "t2.2xlarge"
   size               = "t2.2xlarge"  # Include both instance_type and size
-  volume_size          = 60  # Disk size in GB
+  volume_size        = 60  # Disk size in GB
 }
 "attackbox-3" = {
   name               = "attackbox-3"
@@ -30,5 +30,5 @@
   password           = "suppaP@ssw0rd$"
   instance_type      = "t2.2xlarge"
   size               = "t2.2xlarge"  # Include both instance_type and size
-  volume_size         = 60  # Disk size in GB
+  volume_size        = 60  # Disk size in GB
 }

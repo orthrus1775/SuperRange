@@ -4,6 +4,7 @@
 echo "Setting up GOAD Multi-Range deployment system..."
 
 # Create scripts directory if it doesn't exist
+sudo apt install -y dos2unix
 mkdir -p scripts
 
 # Fix line endings for all shell scripts (handles Windows CRLF issues)
@@ -46,7 +47,7 @@ is_installed() {
 # Install multiple packages at once
 echo "Installing basic dependencies..."
 PACKAGES_TO_INSTALL=""
-for pkg in curl unzip git wget jq asciinema libfontconfig1-dev pandoc npm; do
+for pkg in curl unzip git wget jq asciinema libfontconfig1-dev pandoc npm dos2unix; do
     if ! is_installed $pkg; then
         PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $pkg"
     fi

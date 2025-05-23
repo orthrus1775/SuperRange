@@ -173,13 +173,28 @@ fi
 sed -i "s/eu-west-3c/${AWS_ZONE}/g" $VARS_TF_PATH
 sed -i "s/eu-west-3/${AWS_REGION}/g" $VARS_TF_PATH
 
+LIN_TF_PATH=${TEMPLATE_DIR}/linux.tf
+if [ ! -f "$LIN_TF_PATH" ]; then
+    echo -e "${RED}Error: linux terraform file not found at: $LIN_TF_PATH${NC}"
+    # exit 1
+fi
+sed -i '/size[[:space:]]*=[[:space:]]*string/a\    volume_size        = number' $LIN_TF_PATH
+sed -i '/key_name = "{{lab_identifier}}-linux-keypair"/a\  \n  # Add this root_block_device block\n  root_block_device {\n    volume_size = each.value.volume_size\n    tags = {\n      Name = "Range-1-${each.value.name}-root"\n      Lab = "{{lab_identifier}}"\n    }\n  }' $LIN_TF_PATH
+
 SCRIPTS_PATH=$(pwd)/scripts/
 AWS_SCRIPT=${SCRIPTS_PATH}/setup_aws.sh
 if [ ! -f "$AWS_SCRIPT" ]; then
     echo -e "${RED}Error: AWS setup script not found at: $AWS_SCRIPT${NC}"
     exit 1
 fi
-sed -i 's/python3-pip/python3-pip sshpass/' $AWS_SCRIPT
+sed -i 's/python3-pip/python3-pip sshpass/' $AWS_SCRIPT  
+
+GOAD_CONF=$(pwd)/ad/GOAD-Light/data/config.json
+if [ ! -f "$GOAD_CONF" ]; then
+    echo -e "${RED}Error: GOAD config.json not found at: $GOAD_CONF${NC}"
+    exit 1
+fi
+jq '.lab.hosts[].vulns |= (. + ["disable_firewall"] | unique)' $GOAD_CONF
 
 WS01_PATH=$(pwd)/extensions/ws01/ansible/install.yml
 if [ ! -f "$WS01_PATH" ]; then
@@ -188,6 +203,15 @@ if [ ! -f "$WS01_PATH" ]; then
 fi
 # sed -i '/local_groups: "{{lab\.hosts\[dict_key\]\.local_groups  | default({}) }}"/,$s/^/# /' $WS01_PATH
 sed -i '48,$s/^/# /' $WS01_PATH # Comment out everything on line 48 and after
+
+WS01_CONF=$(pwd)/extensions/ws01/data/config.json
+WS01_DIR=$(pwd)/extensions/ws01/data
+if [ ! -f "$WS01_CONF" ]; then
+    echo -e "${RED}Error: WS01 config.json not found at: $WS01_CONF${NC}"
+    exit 1
+fi
+jq '.lab_extension.hosts[].security = []' $WS01_CONF > temp.json 
+mv $WS01/temp.json $WS01_CONF
 
 if [ ! -f "globalsettings.ini" ]; then
     echo -e "${RED}Error: Could not find glovalsettings.ini${NC}"
@@ -211,7 +235,7 @@ echo -e "${GREEN}GOAD deployment started. Waiting for completion...${NC}"
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}GOAD deployed successfully for Range ${RANGE_ID}.${NC}"
     
-    # Extract and save IPs to range configuration
+    # # Extract and save IPs to range configuration
     # echo -e "${YELLOW}Extracting IPs and updating range configuration...${NC}"
     
     # # Get IPs from terraform output
