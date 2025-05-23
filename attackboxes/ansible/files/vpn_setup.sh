@@ -1,196 +1,53 @@
 #!/bin/bash
 
-# OpenVPN Server Setup Script for Ubuntu
-# Run this script as root
-
-# Exit on error
-set -e
-
-# Default values for command-line parameters
-DEFAULT_PRIVATE_NETWORK="192.168.0.0 255.255.255.0"
-
-# Parse command-line parameters
-PRIVATE_NETWORK=${1:-$DEFAULT_PRIVATE_NETWORK}
-
-# Variables - customize these
-PUBLIC_IP=$(curl -s ifconfig.me)
-PORT=1194
-PROTOCOL=udp
-DNS1="8.8.8.8"
-DNS2="8.8.4.4"
-CIPHER="AES-256-GCM"
-AUTH="SHA256"
-DH_KEY_SIZE=2048
-RSA_KEY_SIZE=2048
-CLIENT_NAME="client1"
-
-echo "Setting up OpenVPN server with private network route: $PRIVATE_NETWORK"
-
-# Update system
-echo "Updating system packages..."
-apt update
-apt upgrade -y
+sudo apt update
+DEBIAN_FRONTEND=noninteractive sudo apt install -y openvpn easy-rsa iptables-persistent wget curl git expect
 echo "127.0.0.1 $(hostname)" | sudo tee -a /etc/hosts
+wget -O openvpn-install.sh https://raw.githubusercontent.com/angristan/openvpn-install/master/openvpn-install.sh
+chmod +x openvpn-install.sh
+sed -i 's/read -rp "DNS \[1-12\]: " -e -i 11 DNS/read -rp "DNS \[1-12\]: " -e -i 9 DNS/' openvpn-install.sh
+sed -i 's/read -rp "Client name: " -e CLIENT/read -rp "Client name: " -e -i C2LAB CLIENT/' openvpn-install.sh
+# CLIENT_NAME="test"
+# PUBLIC_IP=$(curl -s ifconfig.me)
 
-# Install OpenVPN and Easy-RSA
-echo "Installing OpenVPN and Easy-RSA..."
-apt install -y openvpn easy-rsa iptables-persistent
-
-# Setup Easy-RSA directory
-echo "Setting up Easy-RSA..."
-mkdir -p /etc/openvpn/easy-rsa
-cp -r /usr/share/easy-rsa/* /etc/openvpn/easy-rsa/
-cd /etc/openvpn/easy-rsa
-
-# Initialize PKI
-echo "Initializing PKI..."
-./easyrsa init-pki
-
-# Build CA
-echo "Building CA (Certificate Authority)..."
-./easyrsa --batch --req-cn="OpenVPN-CA" build-ca nopass
-
-# Generate server certificate and key
-echo "Generating server certificate and key..."
-./easyrsa --batch gen-req server nopass
-./easyrsa --batch sign-req server server
-
-# Generate Diffie-Hellman parameters
-echo "Generating Diffie-Hellman parameters (this may take a while)..."
-./easyrsa gen-dh
-
-# Generate TLS-Auth key
-echo "Generating TLS-Auth key..."
-openvpn --genkey secret /etc/openvpn/ta.key
-
-# Move certificates and keys to OpenVPN directory
-echo "Moving certificates and keys to OpenVPN directory..."
-cp pki/ca.crt /etc/openvpn/
-cp pki/issued/server.crt /etc/openvpn/
-cp pki/private/server.key /etc/openvpn/
-cp pki/dh.pem /etc/openvpn/
-
-# Create server config
-echo "Creating server configuration..."
-cat > /etc/openvpn/server.conf << EOF
-port $PORT
-proto $PROTOCOL
-dev tun
-ca ca.crt
-cert server.crt
-key server.key
-dh dh.pem
-server 10.8.0.0 255.255.255.0
-ifconfig-pool-persist ipp.txt
-push "redirect-gateway def1 bypass-dhcp"
-push "dhcp-option DNS $DNS1"
-push "dhcp-option DNS $DNS2"
-push "route $PRIVATE_NETWORK"  # Private network route from command-line parameter
-keepalive 10 120
-cipher $CIPHER
-auth $AUTH
-user nobody
-group nogroup
-persist-key
-persist-tun
-status openvpn-status.log
-verb 3
-tls-auth ta.key 0
+expect << EOF
+spawn sudo ./openvpn-install.sh
+expect "IP address:" { send "\r" }
+expect "Public IPv4 address or hostname:" { send "\r" }
+expect "Do you want to enable IPv6 support" { send "\r" }
+expect "Port choice" { send "\r" }
+expect "Protocol" { send "\r" }
+expect "DNS" { send "\r" }
+expect "Enable compression" { send "\r" }
+expect "Customize encryption settings" { send "\r" }
+expect "Press any key to continue" { send "\r" }
+expect "Client name:" { send "\r" }
+expect "Select an option" { send "\r" }
+expect eof
 EOF
 
-# Enable IP forwarding
-echo "Enabling IP forwarding..."
-echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-openvpn.conf
-sysctl --system
+# Enable IP forwarding temporarily
+sudo sysctl -w net.ipv4.ip_forward=1
 
-# Configure firewall (using ufw)
-echo "Configuring firewall..."
-apt install -y ufw
-ufw allow ssh
-ufw allow $PORT/$PROTOCOL
-ufw allow from 10.8.0.0/24
+# Make it permanent by editing /etc/sysctl.conf
+echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf
 
-# Get the primary network interface
-NIC=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
-ufw allow in on $NIC
-ufw allow out on $NIC
-ufw allow in on tun0
-ufw allow out on tun0
+# Enable NAT for traffic from tun0 to eth0
+sudo iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
 
-# Parse the network address and netmask from the PRIVATE_NETWORK variable
-NETWORK_ADDRESS=$(echo $PRIVATE_NETWORK | cut -d' ' -f1)
-NETMASK=$(echo $PRIVATE_NETWORK | cut -d' ' -f2)
+# Allow forwarding from tun0 to eth0
+sudo iptables -A FORWARD -i tun0 -o eth0 -j ACCEPT
 
-# Setup NAT for routing
-echo "Setting up NAT..."
-cat > /etc/ufw/before.rules << EOF
-# NAT table rules
-*nat
-:POSTROUTING ACCEPT [0:0]
-# Allow traffic from OpenVPN client to the internet
--A POSTROUTING -s 10.8.0.0/24 -o $NIC -j MASQUERADE
-COMMIT
-EOF
+# Allow return traffic
+sudo iptables -A FORWARD -i eth0 -o tun0 -m state --state RELATED,ESTABLISHED -j ACCEPT
 
-ufw default deny incoming
-ufw default allow outgoing
-ufw --force enable
+# Install iptables-persistent
+sudo apt update
+sudo apt install iptables-persistent
 
-# Add iptables rules for the private network
-echo "Adding iptables rules for private network routing..."
-iptables -A FORWARD -i tun0 -o $NIC -d $NETWORK_ADDRESS/$NETMASK -j ACCEPT
-iptables -A FORWARD -i $NIC -o tun0 -s $NETWORK_ADDRESS/$NETMASK -j ACCEPT
+# Save current rules
+sudo iptables-save | sudo tee /etc/iptables/rules.v4
 
-# Make iptables rules persistent
-netfilter-persistent save
+echo 'push "route 192.168.111.0 255.255.255.192"' | sudo tee -a /etc/openvpn/server.conf
 
-# Generate client configuration
-echo "Generating client configuration..."
-mkdir -p /etc/openvpn/clients/$CLIENT_NAME
-./easyrsa --batch gen-req $CLIENT_NAME nopass
-./easyrsa --batch sign-req client $CLIENT_NAME
-
-# Create client .ovpn file
-echo "Creating client .ovpn file..."
-cat > /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn << EOF
-client
-dev tun
-proto $PROTOCOL
-remote $PUBLIC_IP $PORT
-resolv-retry infinite
-nobind
-persist-key
-persist-tun
-remote-cert-tls server
-cipher $CIPHER
-auth $AUTH
-verb 3
-key-direction 1
-EOF
-
-# Add CA, cert, key and tls-auth to client config
-echo "<ca>" >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-cat pki/ca.crt >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-echo "</ca>" >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-
-echo "<cert>" >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-cat pki/issued/$CLIENT_NAME.crt >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-echo "</cert>" >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-
-echo "<key>" >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-cat pki/private/$CLIENT_NAME.key >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-echo "</key>" >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-
-echo "<tls-auth>" >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-cat /etc/openvpn/ta.key >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-echo "</tls-auth>" >> /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn
-
-# Start OpenVPN service
-echo "Starting OpenVPN service..."
-systemctl enable openvpn@server
-systemctl start openvpn@server
-
-echo "OpenVPN server setup complete!"
-echo "Client configuration file is located at: /etc/openvpn/clients/$CLIENT_NAME/$CLIENT_NAME.ovpn"
-echo "Transfer this file securely to your client device to connect to the VPN."
-echo "Private network route configured: $PRIVATE_NETWORK"
+sudo systemctl restart openvpn@server

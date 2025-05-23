@@ -48,6 +48,11 @@
       - osslsigncode
       - autossh
       - sshpass
+      - pipx
+      - unzip
+      - tar 
+      - zip
+      - make
     state: present 
   ignore_errors: yes
 
@@ -217,6 +222,26 @@
     - firefox
   when: setup_desktop_shortcuts | default(true)
   failed_when: false  
+
+- name: Check for SSH config overrides in sshd_config.d directory
+  find:
+    paths: /etc/ssh/sshd_config.d/
+    patterns: "*.conf"
+  register: ssh_override_files
+  become: yes
+
+- name: Display SSH override files found
+  debug:
+    msg: "Found SSH config files: {{ ssh_override_files.files | map(attribute='path') | list }}"
+
+- name: Remove problematic SSH config overrides that disable password auth
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ ssh_override_files.files }}"
+  when: ssh_override_files.files is defined
+  become: yes
+  register: removed_overrides
 
 - name: Backup original sshd_config
   copy:
