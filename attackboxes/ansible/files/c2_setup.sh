@@ -56,3 +56,6 @@ git clone https://github.com/BishopFox/sliver.git
 cd sliver
 make
 mkdir bins
+
+curl https://sliver.sh/install|sudo bash  
+sudo ls -la /root/
