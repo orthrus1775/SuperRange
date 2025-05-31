@@ -222,6 +222,8 @@ if [ ! -f "globalsettings.ini" ]; then
     exit 1
 fi
 sed -i 's/keyboard_layouts=\["0000040C", "00000409"\]/keyboard_layouts=\["00000409"\]/g' globalsettings.ini
+sed -i "s|^\(aws_region[[:space:]]*=[[:space:]]*\).*|\1$AWS_REGION|" ~/.goad/goad.ini
+sed -i "s|^\(aws_zone[[:space:]]*=[[:space:]]*\).*|\1$AWS_ZONE|"   ~/.goad/goad.ini
 # echo "rangeid=range$RANGE_ID" >> globalsettings.ini
 
 read -p "Validate setting"
