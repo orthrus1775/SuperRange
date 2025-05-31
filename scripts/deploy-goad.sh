@@ -211,8 +211,8 @@ if [ ! -f "$WS01_CONF" ]; then
     echo -e "${RED}Error: WS01 config.json not found at: $WS01_CONF${NC}"
     exit 1
 fi
-jq '.lab_extension.hosts[].security = []' $WS01_CONF > $WS01_CONF/temp.json 
-mv $WS01_CONF/temp.json $WS01_CONF/config.json
+jq '.lab_extension.hosts[].security = []' $WS01_CONF > $WS01_DIR/temp.json 
+mv $WS01_DIR/temp.json $WS01_CONF
 
 if [ ! -f "globalsettings.ini" ]; then
     echo -e "${RED}Error: Could not find glovalsettings.ini${NC}"
