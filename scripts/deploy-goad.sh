@@ -47,8 +47,10 @@ echo -e "${GREEN}Deploying GOAD for Range ${RANGE_ID}...${NC}"
 RANGE_NUMBER=$(jq -r '.range_number' "$CONFIG_FILE")
 AWS_REGION=$(jq -r '.aws_region' "$CONFIG_FILE")
 AWS_ZONE=$(jq -r '.aws_zone' "$CONFIG_FILE")
-AWS_ZONE=$(jq -r '.aws_zone' "$CONFIG_FILE")
 AWS_KEY_PAIR=$(jq -r '.aws_key_pair' "$CONFIG_FILE")
+
+
+
 
 # Get attackbox configuration
 # ATTACKBOX_COUNT=$(jq -r '.attackboxes.count // 3' "$CONFIG_FILE")
@@ -167,6 +169,7 @@ find ${TEMPLATE_DIR} -type f -exec grep -l "{{lab_name}}" {} \; | while read fil
 done
 
 VARS_TF_PATH=${TEMPLATE_DIR}/variables.tf
+echo $
 if [ ! -f "$VARS_TF_PATH" ]; then
     echo -e "${RED}Error: variables terraform file not found at: $VARS_TF_PATH${NC}"
     exit 1
