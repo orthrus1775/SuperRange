@@ -11,7 +11,7 @@ set -e
 trap 'echo -e "${RED}Error: Command failed at line $LINENO${NC}"; exit 1' ERR
 
 # Configuration
-RANGES=(1 2 3) # Default: Deploy 3 ranges
+RANGES=(1 2 3 4 5 6) # Default: Deploy 3 ranges
 DEPLOYMENT_STATUS_FILE="deployment-status.json"
 GOAD_REPO="https://github.com/Orange-Cyberdefense/GOAD.git"
 GOAD_BRANCH="main"
