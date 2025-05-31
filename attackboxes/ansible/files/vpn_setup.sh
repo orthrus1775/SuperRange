@@ -10,6 +10,7 @@ sed -i 's/read -rp "Client name: " -e CLIENT/read -rp "Client name: " -e -i C2LA
 # CLIENT_NAME="test"
 # PUBLIC_IP=$(curl -s ifconfig.me)
 
+
 expect << EOF
 spawn sudo ./openvpn-install.sh
 expect "IP address:" { send "\r" }

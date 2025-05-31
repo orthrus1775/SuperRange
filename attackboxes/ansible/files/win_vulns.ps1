@@ -590,7 +590,32 @@ $taskName = "SaveCred"
 $taskCommand = "`"$($service11[2])\$($service11[0])`""
 Register-ScheduledTask -TaskName $taskName -Action (New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c $taskCommand") -Trigger (New-ScheduledTaskTrigger -AtLogon) -User $lowpriv_user -Force | Out-Null
 
+
+# Create credential object for Domain Administrator
+$securePassword = ConvertTo-SecureString "8dCT-DJjgScp" -AsPlainText -Force
+$domainAdminCred = New-Object System.Management.Automation.PSCredential("SEVENKINGDOMS\Administrator", $securePassword)
+
+# Run the ACL commands as Domain Administrator
+Invoke-Command -ComputerName localhost -Credential $domainAdminCred -ScriptBlock {
+    $acl = Get-Acl "C:\Program Files\Gnome Master Service"
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("SEVENKINGDOMS\Domain Users","FullControl","ContainerInherit,ObjectInherit","None","Allow")
+    $acl.SetAccessRule($rule)
+    Set-Acl "C:\Program Files\Gnome Master Service" $acl
+    
+    # Verify the change
+    Write-Host "Permissions applied successfully as Domain Administrator" -ForegroundColor Green
+    $newAcl = Get-Acl "C:\Program Files\Gnome Master Service"
+    $newAcl.Access | Where-Object { $_.IdentityReference -eq "SEVENKINGDOMS\Domain Users" }
+}
 Write-Host "[*] ------------------------------------------------------------------------------------" -ForegroundColor Yellow
-Write-Host "[*] Change Permissions on Gnome Master Service to Full Control SEVENKINGOMS\Domain Users" -ForegroundColor Yellow
+Write-Host "[*] Changed Permissions on Gnome Master Service to Full Control SEVENKINGOMS\Domain Users" -ForegroundColor Yellow
 Write-Host "[*] ------------------------------------------------------------------------------------" -ForegroundColor Yellow
 
+
+Write-Host "[*] Scheduled Task to run MMC.exe as SEVENKINGOMS\jaime.lannister" -ForegroundColor Yellow
+$Action = New-ScheduledTaskAction -Execute "mmc.exe"
+$Trigger = New-ScheduledTaskTrigger -AtStartup -RepetitionInterval (New-TimeSpan -Minutes 30) -RepetitionDuration ([TimeSpan]::MaxValue)
+$Principal = New-ScheduledTaskPrincipal -UserId "jaime.lannister" -LogonType Interactive
+$Task = New-ScheduledTask -Action $Action -Trigger $Trigger -Principal $Principal -Description "Run MMC at startup and every 30 minutes as jaime.lannister"
+
+Register-ScheduledTask -TaskName "MMC_Startup_Task" -InputObject $Task

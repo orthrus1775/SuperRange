@@ -133,6 +133,7 @@ do
     generate_client_config "$username" "$email" "$expiry_days"
 done
 
+
 echo "All client configurations generated successfully"
 echo "--------------------------------------------"
 echo "To add a new user in the future, run:"

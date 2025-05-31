@@ -45,6 +45,7 @@ try {
     Write-Error "Failed to create GPO: $($_.Exception.Message)"
 }
 
+
 # Optional: Force group policy update on all computers
 Write-Host "`nTo apply immediately to all computers, run:" -ForegroundColor Magenta
 Write-Host "Invoke-GPUpdate -Computer * -Force" -ForegroundColor White

@@ -111,6 +111,12 @@
     name: xrdp
     enabled: yes
     state: started
+    enabled: yes
+
+- name: pipx check
+  command: pipx ensurepath
+  become: true
+  become_method: sudo    
 
 # - name: Create PolicyKit file for XRDP
 #   copy:
@@ -160,27 +166,6 @@
     state: enabled
     policy: allow
   failed_when: false
-
-# - name: Create a test file to verify deployment
-#   file:
-#     path: /root/attackbox_deployed.txt
-#     state: touch
-#     mode: '0644'
-#     owner: root
-#     group: root
-  
-# - name: Create attack tools directory
-#   file:
-#     path: /opt/attack-tools
-#     state: directory
-#     mode: '0755'
-
-# - name: Clone Git repositories
-#   git:
-#     repo: "{{ item.url }}"
-#     dest: "/opt/attack-tools/{{ item.name }}"
-#   loop: "{{ attackbox_git_repos }}"
-#   failed_when: false
 
 - name: Create user 'attacker' with password
   user:
