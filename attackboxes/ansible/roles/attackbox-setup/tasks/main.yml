@@ -1,9 +1,13 @@
 ---
-# Main tasks for setting up attack boxes
-- name: Update apt cache
-  apt:
-    update_cache: yes
-    cache_valid_time: 3600
+- name: "Updating apt repo/cache"
+  apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+  become: true
+  become_method: sudo
+
+- name: "Upgrade all packages"
+  apt: upgrade=yes force_apt_get=yes
+  become: true
+  become_method: sudo
 
 - name: Install basic tools
   apt:
@@ -11,10 +15,9 @@
       # Basic networking tools
       - net-tools
       - tcpdump
-      - nmap
+      - nano
       - curl
       - wget
-      # Useful utilities
       - git
       - vim
       - unzip
@@ -25,22 +28,47 @@
       - iputils-ping
       - traceroute
       - tmux
+      - ufw
       - screen
       - ubuntu-desktop
       - xrdp
-    state: present
+      - mingw-w64 
+      - build-essential
+      - gpg
+      - binutils-mingw-w64
+      - g++-mingw-w64 
+      - cmake
+      - golang-go
+      - jq
+      - pipx
+      - smbclient
+      - smbmap
+      - rlwrap
+      - openssl
+      - osslsigncode
+      - autossh
+      - sshpass
+      - pipx
+      - unzip
+      - tar 
+      - zip
+      - make
+    state: present 
+  ignore_errors: yes
 
-- name: Install additional security tools
-  apt:
-    name: "{{ attackbox_additional_tools }}"
-    state: present
-  failed_when: false
 
-- name: Install Python tools for pentesting
-  pip:
-    name: "{{ attackbox_additional_python_tools }}"
-    state: present
-  failed_when: false
+
+# - name: Install additional security tools
+#   apt:
+#     name: "{{ attackbox_additional_tools }}"
+#     state: present
+#   failed_when: false
+
+# - name: Install Python tools for pentesting
+#   pip:
+#     name: "{{ attackbox_additional_python_tools }}"
+#     state: present
+#   failed_when: false
 
 # - name: Configure hosts file
 #   template:
@@ -84,17 +112,17 @@
     enabled: yes
     state: started
 
-- name: Create PolicyKit file for XRDP
-  copy:
-    dest: /etc/polkit-1/localauthority/50-local.d/45-allow-colord.pkla
-    content: |
-      [Allow Colord all Users]
-      Identity=unix-user:*
-      Action=org.freedesktop.color-manager.create-device;org.freedesktop.color-manager.create-profile;org.freedesktop.color-manager.delete-device;org.freedesktop.color-manager.delete-profile;org.freedesktop.color-manager.modify-device;org.freedesktop.color-manager.modify-profile
-      ResultAny=no
-      ResultInactive=no
-      ResultActive=yes
-    mode: '0644'
+# - name: Create PolicyKit file for XRDP
+#   copy:
+#     dest: /etc/polkit-1/localauthority/50-local.d/45-allow-colord.pkla
+#     content: |
+#       [Allow Colord all Users]
+#       Identity=unix-user:*
+#       Action=org.freedesktop.color-manager.create-device;org.freedesktop.color-manager.create-profile;org.freedesktop.color-manager.delete-device;org.freedesktop.color-manager.delete-profile;org.freedesktop.color-manager.modify-device;org.freedesktop.color-manager.modify-profile
+#       ResultAny=no
+#       ResultInactive=no
+#       ResultActive=yes
+#     mode: '0644'
 
 - name: Fix XRDP black screen after login
   copy:
@@ -116,14 +144,16 @@
     - 22
     - 80
     - 443
-    - 3389 # RDP port
+    - 3389 
     - 4444
     - 8080
+    - 8888
     - 9001
     - 9002
     - 9003
     - 9004
-  failed_when: fals
+    - 9005
+  failed_when: false
 
 - name: Enable UFW
   ufw:
@@ -131,40 +161,60 @@
     policy: allow
   failed_when: false
 
-- name: Create a test file to verify deployment
-  file:
-    path: /root/attackbox_deployed.txt
-    state: touch
-    mode: '0644'
-    owner: root
-    group: root
+# - name: Create a test file to verify deployment
+#   file:
+#     path: /root/attackbox_deployed.txt
+#     state: touch
+#     mode: '0644'
+#     owner: root
+#     group: root
   
-- name: Create attack tools directory
-  file:
-    path: /opt/attack-tools
-    state: directory
-    mode: '0755'
+# - name: Create attack tools directory
+#   file:
+#     path: /opt/attack-tools
+#     state: directory
+#     mode: '0755'
 
-- name: Clone Git repositories
-  git:
-    repo: "{{ item.url }}"
-    dest: "/opt/attack-tools/{{ item.name }}"
-  loop: "{{ attackbox_git_repos }}"
-  failed_when: false
+# - name: Clone Git repositories
+#   git:
+#     repo: "{{ item.url }}"
+#     dest: "/opt/attack-tools/{{ item.name }}"
+#   loop: "{{ attackbox_git_repos }}"
+#   failed_when: false
 
-- name: Create Desktop directory for ubuntu user
+- name: Create user 'attacker' with password
+  user:
+    name: attacker
+    password: "{{ 'GoCyber2025!!' | password_hash('sha512') }}"
+    shell: /bin/bash
+    create_home: yes
+    groups: sudo
+    append: yes
+    state: present
+  become: yes
+
+- name: Create Documents folder for attacker user
   file:
-    path: /home/ubuntu/Desktop
+    path: /home/attacker/Documents
     state: directory
-    owner: ubuntu
-    group: ubuntu
+    owner: attacker
+    group: attacker
     mode: '0755'
-  when: setup_desktop_shortcuts | default(true)
+  become: yes
+
+- name: Create Desktop folder for attacker user
+  file:
+    path: /home/attacker/Desktop
+    state: directory
+    owner: attacker
+    group: attacker
+    mode: '0755'
+  become: yes
 
 - name: Create desktop shortcuts
   template:
     src: "{{ item }}.desktop.j2"
-    dest: "/home/ubuntu/Desktop/{{ item }}.desktop"
+    dest: "/home/attacker/Desktop/{{ item }}.desktop"
     owner: ubuntu
     group: ubuntu
     mode: '0755'
@@ -174,18 +224,70 @@
   when: setup_desktop_shortcuts | default(true)
   failed_when: false  
 
-- name: Create Documents directory for ubuntu user
-  file:
-    path: /home/ubuntu/Documents
-    state: directory
-    owner: ubuntu
-    group: ubuntu
-    mode: '0755'
-  when: setup_desktop_shortcuts | default(true)
+- name: Check for SSH config overrides in sshd_config.d directory
+  find:
+    paths: /etc/ssh/sshd_config.d/
+    patterns: "*.conf"
+  register: ssh_override_files
+  become: yes
 
-- name: Enable IP forwarding
-  sysctl:
-    name: net.ipv4.ip_forward
-    value: '1'
+- name: Display SSH override files found
+  debug:
+    msg: "Found SSH config files: {{ ssh_override_files.files | map(attribute='path') | list }}"
+
+- name: Remove problematic SSH config overrides that disable password auth
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ ssh_override_files.files }}"
+  when: ssh_override_files.files is defined
+  become: yes
+  register: removed_overrides
+
+- name: Backup original sshd_config
+  copy:
+    src: /etc/ssh/sshd_config
+    dest: /etc/ssh/sshd_config.backup
+    remote_src: yes
+  become: yes
+
+- name: Enable password authentication for all users
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication yes'
     state: present
-    reload: yes
+  become: yes
+  register: ssh_config_password
+
+- name: Enable SSH agent forwarding
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?AllowAgentForwarding'
+    line: 'AllowAgentForwarding yes'
+    state: present
+  become: yes
+  register: ssh_config_agent
+
+- name: Enable X11 forwarding
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?X11Forwarding'
+    line: 'X11Forwarding yes'
+    state: present
+  become: yes
+  register: ssh_config_x11
+
+- name: Ensure UsePAM is enabled
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?UsePAM'
+    line: 'UsePAM yes'
+    state: present
+  become: yes
+
+- name: Restart SSH service if configuration changed
+  service:
+    name: sshd
+    state: restarted
+  become: yes

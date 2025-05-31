@@ -11,7 +11,7 @@ set -e
 trap 'echo -e "${RED}Error: Command failed at line $LINENO${NC}"; exit 1' ERR
 
 # Configuration
-RANGES=(1 2 3) # Default: Deploy 3 ranges
+RANGES=(1 2 3 4 5 6) # Default: Deploy 3 ranges
 DEPLOYMENT_STATUS_FILE="deployment-status.json"
 GOAD_REPO="https://github.com/Orange-Cyberdefense/GOAD.git"
 GOAD_BRANCH="main"
@@ -72,13 +72,13 @@ get_aws_config() {
     # Get AWS region
     read -p "Enter AWS region (default: us-east-1): " AWS_REGION
     AWS_REGION=${AWS_REGION:-us-east-1}
-    read -p "Enter AWS region (default: us-east-1): " AWS_REGION
-    AWS_ZONE=${AWS_REGION:-us-east-1a}
+    read -p "Enter AWS region (default: us-east-1a): " AWS_ZONE
+    AWS_ZONE=${AWS_ZONE:-us-east-1a}
     
     # Export as environment variables
     export TF_VAR_aws_key_pair="$AWS_KEY_PAIR"
     export TF_VAR_aws_region="$AWS_REGION"
-    export TF_VAR_aws_region="$AWS_REGION"
+    export TF_VAR_aws_zone="$AWS_ZONE"
     echo -e "${GREEN}AWS configuration set.${NC}"
 }
 
