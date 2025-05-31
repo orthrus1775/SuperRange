@@ -47,6 +47,7 @@ echo -e "${GREEN}Deploying GOAD for Range ${RANGE_ID}...${NC}"
 RANGE_NUMBER=$(jq -r '.range_number' "$CONFIG_FILE")
 AWS_REGION=$(jq -r '.aws_region' "$CONFIG_FILE")
 AWS_ZONE=$(jq -r '.aws_zone' "$CONFIG_FILE")
+AWS_ZONE=$(jq -r '.aws_zone' "$CONFIG_FILE")
 AWS_KEY_PAIR=$(jq -r '.aws_key_pair' "$CONFIG_FILE")
 
 # Get attackbox configuration

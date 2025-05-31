@@ -46,6 +46,7 @@ cat > "$CONFIG_FILE" <<EOF
   "range_number": ${RANGE_ID},
   "aws_region": "${AWS_REGION}",
   "aws_zone": "${AWS_ZONE}",
+  "aws_zone": "${AWS_ZONE}",
   "aws_key_pair": "${AWS_KEY_PAIR}",
   "vpc_cidr": "${VPC_CIDR}",
   "subnet_cidr": "${SUBNET_CIDR}",
