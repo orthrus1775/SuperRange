@@ -4,14 +4,14 @@
 attackbox-1 ansible_host={{ip_range}}.50 dict_key=attackbox-1 ansible_user=goadmin
 attackbox-2 ansible_host={{ip_range}}.51 dict_key=attackbox-2 ansible_user=goadmin
 attackbox-3 ansible_host={{ip_range}}.52 dict_key=attackbox-3 ansible_user=goadmin
-attackbox-2 ansible_host={{ip_range}}.51 dict_key=attackbox-4 ansible_user=goadmin
-attackbox-3 ansible_host={{ip_range}}.52 dict_key=attackbox-5 ansible_user=goadmin
+attackbox-2 ansible_host={{ip_range}}.53 dict_key=attackbox-4 ansible_user=goadmin
+attackbox-3 ansible_host={{ip_range}}.54 dict_key=attackbox-5 ansible_user=goadmin
 {% else %}
 attackbox-1 ansible_host={{ip_range}}.50 dict_key=attackbox-1
 attackbox-2 ansible_host={{ip_range}}.51 dict_key=attackbox-2
 attackbox-3 ansible_host={{ip_range}}.52 dict_key=attackbox-3
-attackbox-2 ansible_host={{ip_range}}.51 dict_key=attackbox-4
-attackbox-3 ansible_host={{ip_range}}.52 dict_key=attackbox-5
+attackbox-2 ansible_host={{ip_range}}.53 dict_key=attackbox-4
+attackbox-3 ansible_host={{ip_range}}.54 dict_key=attackbox-5
 {% endif %}
 [extensions]
 attackbox-1
