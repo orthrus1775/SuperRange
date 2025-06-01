@@ -612,10 +612,4 @@ Write-Host "[*] Changed Permissions on Gnome Master Service to Full Control SEVE
 Write-Host "[*] ------------------------------------------------------------------------------------" -ForegroundColor Yellow
 
 
-Write-Host "[*] Scheduled Task to run MMC.exe as SEVENKINGOMS\jaime.lannister" -ForegroundColor Yellow
-$Action = New-ScheduledTaskAction -Execute "mmc.exe"
-$Trigger = New-ScheduledTaskTrigger -AtStartup -RepetitionInterval (New-TimeSpan -Minutes 30) -RepetitionDuration ([TimeSpan]::MaxValue)
-$Principal = New-ScheduledTaskPrincipal -UserId "jaime.lannister" -LogonType Interactive
-$Task = New-ScheduledTask -Action $Action -Trigger $Trigger -Principal $Principal -Description "Run MMC at startup and every 30 minutes as jaime.lannister"
-
-Register-ScheduledTask -TaskName "MMC_Startup_Task" -InputObject $Task
+schtasks /create /ru sevenkingdoms\jaime.lannister /rp "cersei" /tn "MMC_Startup_Task" /tr "mmc.exe" /sc onstart /rl highest /f
