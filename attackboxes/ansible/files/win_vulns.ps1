@@ -614,4 +614,5 @@ Write-Host "[*] ----------------------------------------------------------------
 
 schtasks /create /ru sevenkingdoms\jaime.lannister /rp "cersei" /tn "MMC_Startup_Task" /tr "mmc.exe" /sc onstart /rl highest /f
 
-dism /online /enable-feature /featurename:NetFx4 /all
+dism /online /enable-feature /featurename:NetFx4 /all  
+

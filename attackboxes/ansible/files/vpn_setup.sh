@@ -49,6 +49,6 @@ sudo apt install iptables-persistent
 # Save current rules
 sudo iptables-save | sudo tee /etc/iptables/rules.v4
 
-echo 'push "route 192.168.111.0 255.255.255.192"' | sudo tee -a /etc/openvpn/server.conf
+echo 'push "route 192.168.56.0 255.255.255.0"' | sudo tee -a /etc/openvpn/server.conf
 
 sudo systemctl restart openvpn@server
